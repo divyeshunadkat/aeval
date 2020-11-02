@@ -42,7 +42,7 @@ set(CMAKE_FIND_LIBRARY_SUFFIXES ".a" ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
 
 set (Boost_USE_STATIC_LIBS ON)
-set (BOOST_COMPONENTS system)
+set (BOOST_COMPONENTS regex program_options filesystem system)
 if (UNIT_TESTS)
   set (BOOST_COMPONENTS ${BOOST_COMPONENTS} unit_test_framework)
 endif()

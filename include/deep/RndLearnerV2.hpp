@@ -9,7 +9,7 @@ namespace ufo
 {
   class RndLearnerV2 : public RndLearner
   {
-    private:
+    protected:
 
     map<Expr, ExprSet> modelsOfFailures;
 

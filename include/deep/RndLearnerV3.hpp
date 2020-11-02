@@ -13,7 +13,7 @@ namespace ufo
 {
   class RndLearnerV3 : public RndLearnerV2
   {
-    private:
+    protected:
 
     ExprSet checked;
     map<int, ExprVector> candidates;
@@ -137,6 +137,7 @@ namespace ufo
       for (int h = 0; h < ruleManager.chcs[tmp[0]].dstVars.size(); h++)
       {
         Expr var = ruleManager.chcs[tmp[0]].srcVars[h];
+
         if (iterators[invNum] == var)
           ev.push_back(iterators[invNum]);
         else
@@ -274,7 +275,25 @@ namespace ufo
           ExprSet cnjs;
           ExprSet newCnjs;
           Expr it = iterators[invNum];
+          /*
+          outs () << "Candidate Invariant:\n" << *cnd << "\n\n";
+          outs () << "Iterator variable:" << *it << "\n\n";
+          for (auto &hr: ruleManager.chcs)
+          {
+            int iNum = getVarIndex(hr.srcRelation, decls);
+            if(invNum != iNum) continue;
+            if(hr.isFact || hr.isQuery) continue;
+            for (int h = 0; h < hr.srcVars.size(); h++)
+            {
+              if(it == hr.srcVars[h])
+                outs () << "Original iterator variable:" << *(hr.origSrcArgs[h]) << "\n\n";
+            }
+          }
+          */
           if (it != NULL) cnd = replaceArrRangeForIndCheck (invNum, cnd);
+          /*
+          outs () << "Candidate Invariant after replacing range:\n" << *cnd << "\n\n";
+          */
         }
         candidates[invNum].push_back(cnd);
         return true;
@@ -316,11 +335,17 @@ namespace ufo
     {
       assert(isOpX<FORALL>(cand));
       Expr itRepl = iterators[invNum];
+
+      /*
       Expr post = postconds[invNum];
+      Expr pre = preconds[invNum];
+      outs () << "Loop counter post bounds when replacing:\n" << *post << "\n\n";
+      outs () << "Loop counter pre bounds when replacing:\n" << *pre << "\n\n";
+
       ExprSet cnjs;
       ExprSet newCnjs;
       getConj(cand->last()->left(), cnjs);
-
+      */
       // TODO: support the case when there are two or more quantified vars
 
       Expr it = bind::fapp(cand->arg(0));
@@ -1261,6 +1286,15 @@ namespace ufo
         }
         exprs.insert(disjoin(negged, m_efac));
       }
+
+      /*
+      outs () << "\n\n Printing the annotated body \n\n";
+      for ( auto & e : exprs ) {
+        u.print(e);
+        outs () << "\n\n";
+      }
+      */
+
       return !u.isSat(exprs);
     }
 
@@ -1285,6 +1319,12 @@ namespace ufo
         Expr a = ruleManager.chcs[cycle[0]].srcVars[i];
         Expr b = bnd.bindVars.back()[i];
         if (!bind::isIntConst(a) /*|| !contains(postconds[invNum], a)*/) continue;
+
+        /*
+        outs () << "SSAS[invNum]:" << *ssas[invNum] << "\n\n";
+        outs () << "Src Var a:" << *a << "\n\n";
+        outs () << "Bnd Var b:" << *b << "\n\n";
+        */
 
         // TODO: pick one if there are multiple available
         if (u.implies(ssas[invNum], mk<GT>(a, b)))
@@ -1336,6 +1376,7 @@ namespace ufo
         outs () << ")\n";
       }
     }
+
   };
 
   inline void learnInvariants3(string smt, char * outfile, int maxAttempts, bool freqs, bool aggp, bool enableDataLearning, const vector<string> & behaviorfiles)

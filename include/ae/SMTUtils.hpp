@@ -406,6 +406,115 @@ namespace ufo
       else outs () << z3.toSmtLib (e);
     }
 
+    string exprToSmtlibStr (const Expr & e)
+    {
+      ostringstream smtString;
+      if (isOpX<FORALL>(e) || isOpX<EXISTS>(e))
+      {
+        if (isOpX<FORALL>(e)) smtString << "(forall (";
+        else smtString << "(exists (";
+
+        for (int i = 0; i < e->arity() - 1; i++)
+        {
+          Expr var = bind::fapp(e->arg(i));
+          smtString << "(" << *var << " " << varType(var) << ")";
+          if (i != e->arity() - 2) smtString << " ";
+        }
+        smtString << ") ";
+        smtString << exprToSmtlibStr (e->last());
+        smtString << ")";
+      }
+      else if (isOpX<AND>(e))
+      {
+        smtString << "(and ";
+        ExprSet cnjs;
+        getConj(e, cnjs);
+        int i = 0;
+        for (auto & c : cnjs)
+        {
+          i++;
+          smtString << exprToSmtlibStr(c);
+          if (i != cnjs.size()) smtString << " ";
+        }
+        smtString << ")";
+      }
+      else if (isOpX<OR>(e))
+      {
+        smtString << "(or ";
+        ExprSet dsjs;
+        getDisj(e, dsjs);
+        int i = 0;
+        for (auto & d : dsjs)
+        {
+          i++;
+          smtString << exprToSmtlibStr(d);
+          if (i != dsjs.size()) smtString << " ";
+        }
+        smtString << ")";
+      }
+      else if (isOpX<IMPL>(e) || isOp<ComparissonOp>(e))
+      {
+        if (isOpX<IMPL>(e)) smtString << "(=> ";
+        if (isOpX<EQ>(e)) smtString << "(= ";
+        if (isOpX<GEQ>(e)) smtString << "(>= ";
+        if (isOpX<LEQ>(e)) smtString << "(<= ";
+        if (isOpX<LT>(e)) smtString << "(< ";
+        if (isOpX<GT>(e)) smtString << "(> ";
+        if (isOpX<NEQ>(e)) smtString << "(distinct ";
+        smtString << exprToSmtlibStr(e->left());
+        smtString << " ";
+        smtString << exprToSmtlibStr(e->right());
+        smtString << ")";
+      }
+      else if (isOpX<ITE>(e))
+      {
+        smtString << "(ite ";
+        smtString << exprToSmtlibStr(e->left());
+        smtString << " ";
+        smtString << exprToSmtlibStr(e->right());
+        smtString << " ";
+        smtString << exprToSmtlibStr(e->last());
+        smtString << ")";
+      }
+      else if (isOpX<STORE>(e))
+      {
+        smtString << "(store ";
+        for (int i = 0; i < e->arity() - 1; i++)
+        {
+          smtString << exprToSmtlibStr(e->arg(i));
+          if (i != e->arity() - 2) smtString << " ";
+        }
+        smtString << ") ";
+      }
+      else  if (isOpX<SELECT>(e))
+      {
+        smtString << "(select ";
+        for (int i = 0; i < e->arity() - 1; i++)
+        {
+          smtString << exprToSmtlibStr(e->arg(i));
+          if (i != e->arity() - 2) smtString << " ";
+        }
+        smtString << ") ";
+      }
+      else if (isOpX<FDECL>(e))
+      {}
+      else smtString << z3.toSmtLib (e);
+
+      return smtString.str();
+    }
+
+    string relSmtlibStr (const Expr & rel, const ExprVector & args)
+    {
+      //assert(rel != NULL);
+      // assert(args.size() > 0);
+      if(rel == NULL) return "";
+      ostringstream relSmtStr;
+      relSmtStr << "(" << * rel << " ";
+      for(auto &a: args) relSmtStr << *a << ", ";
+      relSmtStr << ")";
+      return relSmtStr.str();
+    }
+
     void serialize_formula(Expr form)
     {
       outs () << "(assert ";

@@ -34,11 +34,17 @@ namespace ufo
     ExprVector dstVars;
     ExprVector locVars;
 
+    ExprVector origSrcArgs;
+    ExprVector origDstArgs;
+
     Expr body;
     Expr head;
 
     Expr srcRelation;
     Expr dstRelation;
+
+    Expr origSrcRel;
+    Expr origDstRel;
 
     bool isFact;
     bool isQuery;
@@ -62,6 +68,48 @@ namespace ufo
         body = mk<AND>(body, mk<EQ>(_dstVars[i], dstVars[i]));
       }
     }
+
+    void rewriteToOrigVars ()
+    {
+      for (int i = 0; i < srcVars.size(); i++)
+        body = mk<AND>(body, mk<EQ>(origSrcArgs[i], srcVars[i]));
+      for (int i = 0; i < dstVars.size(); i++)
+        body = mk<AND>(body, mk<EQ>(origDstArgs[i], dstVars[i]));
+
+      ExprVector allVars;
+      allVars.insert(allVars.end(), srcVars.begin(), srcVars.end());
+      allVars.insert(allVars.end(), dstVars.begin(), dstVars.end());
+      body = simpleQE(body, allVars);
+    }
+
+    void print()
+    {
+      if (isFact) outs () << "  INIT:\n";
+      else if (isInductive) outs () << "  TRANSITION RELATION:\n";
+      else if (isQuery) outs () << "  BAD:\n";
+      else outs () << "  OTHER RELATION: \n";
+
+      outs () << "    " << * srcRelation;
+      if (srcVars.size() > 0)
+      {
+        outs () << " (";
+        for(auto &a: srcVars) outs() << *a << ", ";
+        outs () << "\b\b)";
+      }
+
+      outs () << " -> " << * dstRelation;
+      if (dstVars.size() > 0)
+      {
+        outs () << " (";
+        for(auto &a: dstVars) outs() << *a << ", ";
+        outs () << "\b\b)";
+      }
+
+      outs () << "\n    body: " << * body;
+      outs () << "\n    head: " << * head;
+      outs () << "\n";
+    }
+
   };
 
   class CHCs
@@ -97,6 +145,32 @@ namespace ufo
             if (e->arg(0)->arity() >= 2)
               return true;
       return false;
+    }
+
+    void extractOrigs (Expr term, ExprVector& origArgs, Expr & origRel)
+    {
+      if (isOpX<AND>(term))
+      {
+        for (auto it = term->args_begin(), end = term->args_end(); it != end; ++it)
+        {
+          extractOrigs(*it, origArgs, origRel);
+        }
+      }
+      else
+      {
+        if (isOpX<FAPP>(term))
+        {
+          if (term->arity() > 0)
+          {
+            if (isOpX<FDECL>(term->arg(0)))
+            {
+              origRel = term;
+              for (auto it = term->args_begin()+1, end = term->args_end(); it != end; ++it)
+                origArgs.push_back(*it);
+            }
+          }
+        }
+      }
     }
 
     void preprocess (Expr term, ExprVector& srcVars, Expr &srcRelation, ExprSet& lin)
@@ -256,6 +330,7 @@ namespace ufo
           }
           hr.srcRelation = mk<TRUE>(m_efac);
         }
+        extractOrigs(body, hr.origSrcArgs, hr.origSrcRel);
 
         if (isOpX<FAPP>(head))
         {
@@ -277,6 +352,7 @@ namespace ufo
           hr.head = mk<FALSE>(m_efac);
           hr.dstRelation = mk<FALSE>(m_efac);
         }
+        extractOrigs(head, hr.origDstArgs, hr.origDstRel);
 
         hr.isFact = isOpX<TRUE>(hr.srcRelation);
         hr.isQuery = (hr.dstRelation == failDecl);
@@ -797,8 +873,9 @@ namespace ufo
       outs() << "CHCs:\n";
       for (auto &hr: chcs){
         if (hr.isFact) outs() << "  INIT:\n";
-        if (hr.isInductive) outs() << "  TRANSITION RELATION:\n";
-        if (hr.isQuery) outs() << "  BAD:\n";
+        else if (hr.isInductive) outs() << "  TRANSITION RELATION:\n";
+        else if (hr.isQuery) outs() << "  BAD:\n";
+        else outs() << "  OTHER RELATION:\n";
 
         outs () << "    " << * hr.srcRelation;
         if (hr.srcVars.size() > 0)
@@ -807,17 +884,120 @@ namespace ufo
           for(auto &a: hr.srcVars) outs() << *a << ", ";
           outs () << "\b\b)";
         }
-        outs () << " -> " << * hr.dstRelation;
 
+        outs () << " -> " << * hr.dstRelation;
         if (hr.dstVars.size() > 0)
         {
           outs () << " (";
           for(auto &a: hr.dstVars) outs() << *a << ", ";
           outs () << "\b\b)";
         }
-        outs() << "\n    body: " << * hr.body << "\n";
+
+        outs () << "\n    body: " << * hr.body;
+        outs () << "\n    head: " << * hr.head;
+        outs () << "\n";
       }
     }
+
+    template <typename OutputStream>
+    friend OutputStream &operator<< (OutputStream &out, CHCs & rm)
+    {
+      ExprSet vars;
+      for( auto & hr : rm.chcs) {
+        for ( auto & v : hr.origSrcArgs )
+          filter (v, bind::IsConst (), inserter (vars, vars.begin())); // prepare vars
+        for ( auto & v : hr.origDstArgs )
+          filter (v, bind::IsConst (), inserter (vars, vars.begin())); // prepare vars
+      }
+
+      for (const Expr &v : vars)
+      {
+        assert (bind::IsConst() (v));
+        out << "(declare-var " << v << " ";
+        Expr ty = bind::typeOf (v);
+        if (isOpX<BOOL_TY> (ty)) out << "Bool ";
+        else if (isOpX<REAL_TY> (ty)) out << "Real ";
+        else if (isOpX<INT_TY> (ty)) out << "Int ";
+        else if (isOpX<ARRAY_TY> (ty))
+        {
+          out << "(Array ";
+          if (isOpX<INT_TY> (sort::arrayIndexTy (ty)))
+            out << "Int ";
+          else out << "UnknownSort ";
+          if (isOpX<INT_TY> (sort::arrayValTy (ty)))
+            out << "Int";
+          else out << "UnknownSort";
+          out << ") ";
+        }
+        else out << "UnknownSort ";
+        out << ")\n";
+      }
+      out << "\n";
+
+      for (const Expr & decl : rm.decls)
+      {
+        out << "(declare-rel " << *bind::fname (decl) << " (";
+        for (unsigned i = 0; i < bind::domainSz (decl); i++)
+        {
+          Expr ty = bind::domainTy (decl, i);
+          if (isOpX<BOOL_TY> (ty)) out << "Bool ";
+          else if (isOpX<REAL_TY> (ty)) out << "Real ";
+          else if (isOpX<INT_TY> (ty)) out << "Int ";
+          else if (isOpX<ARRAY_TY> (ty))
+          {
+            out << "(Array ";
+            if (isOpX<INT_TY> (sort::arrayIndexTy (ty)))
+              out << "Int ";
+            else out << "UnknownSort ";
+            if (isOpX<INT_TY> (sort::arrayValTy (ty)))
+              out << "Int";
+            else out << "UnknownSort";
+            out << ") ";
+          }
+          else out << "UnknownSort ";
+        }
+        out << "))\n";
+      }
+      out << "\n";
+
+      SMTUtils u(rm.m_efac);
+      for (auto &hr : rm.chcs) {
+        if( hr.isFact ) {
+          // string smtStr = u.exprToSmtlibStr(mk<AND>(hr.body, hr.origSrcRel));
+          string bodySmtStr = u.exprToSmtlibStr(hr.body);
+          ostringstream dstRelSmtStr;
+          dstRelSmtStr << *hr.origDstRel;
+          out << "(rule (and " << bodySmtStr << " " << dstRelSmtStr.str() << ") )\n\n";
+          // string bodySmtStr = u.exprToSmtlibStr(hr.body);
+          // string dstRelSmtStr = u.relSmtlibStr(hr.origDstRel, hr.origDstArgs);
+          // out << "(rule (and " << bodySmtStr << " " << dstRelSmtStr << ") )\n";
+        } else if( hr.isQuery ) {
+          string bodySmtStr = u.exprToSmtlibStr(hr.body);
+          ostringstream srcRelSmtStr;
+          srcRelSmtStr << *hr.origSrcRel;
+          // string srcRelSmtStr = u.exprToSmtlibStr(hr.origSrcRel);
+          // string srcRelSmtStr = u.relSmtlibStr(hr.origSrcRel, hr.origSrcArgs);
+          out << "(rule (=> " << "(and " << bodySmtStr << " " << srcRelSmtStr.str() << ") false))\n\n";
+        } else {
+          string bodySmtStr = u.exprToSmtlibStr(hr.body);
+          // string srcRelSmtStr; //= u.relSmtlibStr(hr.origSrcRel, hr.origSrcArgs);
+          ostringstream srcRelSmtStr;
+          //if(!isOpX<True>(hr.origSrcRel))
+          srcRelSmtStr << *hr.origSrcRel;
+          string antecedent = "(and " + bodySmtStr + " " + srcRelSmtStr.str() + ") ";
+          string headSmtStr = u.exprToSmtlibStr(hr.head);
+          // string dstRelSmtStr; // = u.relSmtlibStr(hr.origDstRel, hr.origDstArgs);
+          ostringstream dstRelSmtStr;
+          //if(!isOpX<True>(hr.origDstRel))
+          dstRelSmtStr << *hr.origDstRel;
+          string consequent = "(and " + headSmtStr + " " + dstRelSmtStr.str() + ")";
+          out << "(rule (=> " << antecedent << consequent << ") )\n\n";
+        }
+      }
+
+      return out;
+    }
+
   };
 }
 
