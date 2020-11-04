@@ -58,6 +58,39 @@ namespace ufo
     return emptyIntersect(a, bv);
   }
 
+  template<typename Range> static int intersectSize(Expr a, Range& bv){
+    ExprVector av;
+    filter (a, bind::IsConst (), inserter(av, av.begin()));
+    ExprSet intersect;
+    for (auto &var1: av){
+      for (auto &var2: bv)
+        if (var1 == var2) intersect.insert(var1);
+    }
+    return intersect.size();
+  }
+
+  inline static Expr multVar(Expr var, int coef){
+    if (coef == 0)
+      return mkTerm (mpz_class (0), var->getFactory());
+    if (isOpX<MPZ>(var)) return
+      mkTerm (mpz_class (lexical_cast<int>(var) * coef), var->getFactory());
+    if (isOpX<MPQ>(var)) return
+      mkTerm (mpq_class (lexical_cast<int>(var) * coef), var->getFactory());
+
+    return mk<MULT>(mkTerm (mpz_class (coef), var->getFactory()), var);
+  }
+
+  inline static int isMultVar(Expr e, Expr var){
+    if (e == var) return 1;
+    if (!isOpX<MULT>(e)) return 0;
+    if (isOpX<MPZ>(e->right()) && var == e->left()) return lexical_cast<int>(e->right());
+    if (isOpX<MPZ>(e->left()) && var == e->right()) return lexical_cast<int>(e->left());
+    if (isOpX<MPQ>(e->right()) && var == e->left()) return lexical_cast<int>(e->right());
+    if (isOpX<MPQ>(e->left()) && var == e->right()) return lexical_cast<int>(e->left());
+    return 0;
+  }
+
+
   // if at the end disjs is empty, then a == true
   inline static void getConj (Expr a, ExprSet &conjs)
   {
@@ -3437,6 +3470,77 @@ namespace ufo
       return VisitAction::doKids ();
     }
   };
+
+  Expr projectITE(Expr ite, Expr var)
+  {
+    if (isOpX<ITE>(ite))
+    {
+      return mk<ITE>(ite->arg(0), projectITE(ite->arg(1), var), projectITE(ite->arg(2), var));
+    }
+    else
+    {
+      ExprSet cnjs;
+      getConj(ite, cnjs);
+      for (auto & a : cnjs)
+      {
+        if (a->left() == var) return a->right();
+        else if (a->right() == var) return a->left();
+      }
+
+      assert(0);
+    }
+  }
+
+  struct EqNumMiner : public std::unary_function<Expr, VisitAction>
+  {
+    ExprSet& eqs;
+    Expr& var;
+    
+    EqNumMiner (Expr& _var, ExprSet& _eqs): var(_var), eqs(_eqs) {};
+    
+    VisitAction operator() (Expr exp)
+    {
+      if (isOpX<EQ>(exp) && (contains(exp, var)) && exp->right() != exp->left() &&
+          isNumeric(exp->left()) && isNumeric(exp->right()))
+      {
+        eqs.insert(ineqMover(exp, var));
+        return VisitAction::skipKids ();
+      }
+      return VisitAction::doKids ();
+    }
+  };
+
+  struct EqBoolMiner : public std::unary_function<Expr, VisitAction>
+  {
+    ExprSet& eqs;
+    Expr& var;
+    
+    EqBoolMiner (Expr& _var, ExprSet& _eqs): var(_var), eqs(_eqs) {};
+    
+    VisitAction operator() (Expr exp)
+    {
+      if (isOpX<EQ>(exp) && (exp->left() == var || exp->right() == var))
+      {
+        eqs.insert(exp);
+        return VisitAction::skipKids ();
+      }
+      return VisitAction::doKids ();
+    }
+  };
+
+  inline void getEqualities (Expr exp, Expr var, ExprSet& eqs)
+  {
+    if (bind::isIntConst(var) || bind::isRealConst(var))
+    {
+      EqNumMiner trm (var, eqs);
+      dagVisit (trm, exp);
+    }
+    else
+    {
+      EqBoolMiner trm (var, eqs);
+      dagVisit (trm, exp);
+    }
+  }
 
   inline Expr rewriteBoolEq (Expr exp)
   {

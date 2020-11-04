@@ -174,8 +174,26 @@ namespace apara
         }
         itsel++;
       }
-      Expr minCons  = mk<IMPL>(igeqk3, conjoin(conj_min_constraints, m_efac));
-      Expr maxCons  = mk<IMPL>(iltk4, conjoin(conj_max_constraints, m_efac));
+
+      ExprSet qVars;
+      qVars.insert(iterators[invNum]);
+      Expr minCons  = mkNeg(eliminateQuantifiers(mkNeg(mk<IMPL>(igeqk3, conjoin(conj_min_constraints, m_efac))), qVars));
+      Expr maxCons  = mkNeg(eliminateQuantifiers(mkNeg(mk<IMPL>(iltk4, conjoin(conj_max_constraints, m_efac))), qVars));
+
+      qVars.clear();
+      qVars.insert(k3Var);
+      AeValSolver ae1(mk<TRUE>(m_efac), mk<AND>(mk<GEQ>(k3Var, k1Var), minCons), qVars);
+
+      if (ae1.solve()) assert(0);
+        else minCons = simplifyArithm(ae1.getSkolemFunction(false));
+
+      qVars.clear();
+      qVars.insert(k4Var);
+      AeValSolver ae2(mk<TRUE>(m_efac), mk<AND>(mk<LEQ>(k4Var, k2Var), maxCons), qVars);
+
+      if (ae2.solve()) assert(0);
+        else maxCons = simplifyArithm(ae2.getSkolemFunction(false));
+
       if(o.getVerbosity() > 1) {
         outs () << "Printing min constraint: \n" << *minCons << "\n\n";
         outs () << "Printing max constraint: \n" << *maxCons << "\n\n";
