@@ -43,7 +43,7 @@ namespace apara
         ds.initArrayStuff(bnd, i, pref);
       }
       vector<string> behaviorfiles;
-      ds.getDataCandidates(cands, behaviorfiles);
+      ds.getDataCandidates(cands, behaviorfiles); // Data Learning enabled by default!
       for (auto& dcl: ruleManager.wtoDecls) ds.getSeeds(dcl, cands);
       ds.refreshCands(cands);
       for (auto& dcl: ruleManager.decls) ds.doSeedMining(dcl->arg(0), cands[dcl->arg(0)], false);
@@ -137,8 +137,9 @@ namespace apara
 
     bool makeParallel()
     {
-      ds.checkAccesses();
+      if(o.getVerbosity() > 1) outs () << "\nInvoked the Parallelization Engine\n";
       bool bs = bootstrapInvs();
+      ds.checkAccesses();
       if(!bs) learnInvs();
       getSimplifiedInvExpr();
       transformCHCs();
