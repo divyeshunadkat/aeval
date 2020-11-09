@@ -22,25 +22,25 @@
   (= a0 (ite (= i C3) (store a1 0 C2) a1))
   (= i1 (+ i 1))) (inv0 a0 i1 C1 C2 C3 n (select a0 i))))
 
-(rule (=> (and (inv0 a2 i C1 C2 C3 n elem) (>= i n)) (inv1 a i C1 C2 C3 n elem)))
+(rule (=> (and (inv0 a i C1 C2 C3 n elem) (>= i n)) (inv1 a1 0 C1 C2 C3 n elem)))
 
-(rule (=> (and (inv1 a i C1 C2 C3 n elem) (<= i (div n 2))
-  (= a1 (store a i C1))
-  (= a2 (ite (= i C3) (store a1 0 C2) a1))
-  (= i1 (+ i 1))) (inv1 a2 i1 C1 C2 C3 n (select a2 i))))
+(rule (=> (and (inv1 a1 i C1 C2 C3 n elem) (<= i (div n 2))
+  (= a2 (store a1 i C1))
+  (= a0 (ite (= i C3) (store a1 0 C2) a1))
+  (= i1 (+ i 1))) (inv1 a0 i1 C1 C2 C3 n (select a0 i))))
   
-(rule (=> (and (inv1 a i C1 C2 C3 n elem) (> i (div n 2))) (inv2 a i C1 C2 C3 n elem) ))
+(rule (=> (and (inv1 a1 i C1 C2 C3 n elem) (> i (div n 2))) (inv2 a1 i C1 C2 C3 n elem) ))
 
-(rule (=> (and (inv2 a i C1 C2 C3 n elem) (> i (div n 2))
-  (= a2 (store a i C1))
-  (= i1 (+ i 1))) (inv1 a2 i1 C1 C2 C3 n (select a1 i))))
+(rule (=> (and (inv2 a1 i C1 C2 C3 n elem) (> i (div n 2))
+  (= a2 (store a1 i C1))
+  (= i1 (+ i 1))) (inv2 a2 i1 C1 C2 C3 n (select a2 i))))
 
-(rule (=> (and (inv0 a0 i C1 C2 C3 n elem) (inv2 a2 i C1 C2 C3 n elem) (>= i n)
-      (<= 0 i1) (< i1 n) (not (= (select a0 i1) (select a2 i1) ))) fail))
+(rule (=> (and (inv0 a i C1 C2 C3 n elem) (inv2 a2 i C1 C2 C3 n elem) (>= i n)
+      (<= 0 i1) (< i1 n) (not (= (select a i1) (select a2 i1) ))) fail))
 
 (query fail)
 
-
+;
 ;void s_arr2 (int *a, int n) {
 ;
 ;  const int C1 = 10;
@@ -54,4 +54,5 @@
 ;    }
 ;  }
 ;}
+;
 
