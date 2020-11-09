@@ -591,10 +591,11 @@ namespace ufo
     Expr plusEps(Expr e, bool isInt = true)
     {
       if (isOpX<MPZ>(e) && isInt)
-        return mkTerm (mpz_class (boost::lexical_cast<int> (e) + 1), efac);
-
-      if (isInt) return mk<PLUS>(e, mkTerm (mpz_class (1), efac));
-      else return mk<PLUS>(e, mkTerm (mpq_class (1), efac));
+        return mkMPZ(c + boost::lexical_cast<cpp_int> (e), efac);
+      
+      Expr ce = isInt ? mkMPZ(c, efac) :
+                        mkTerm (mpq_class (lexical_cast<string>(c)), efac);
+      return mk<PLUS>(e, ce);
     }
 
     /**
@@ -1442,7 +1443,7 @@ namespace ufo
   /**
    * Simple wrapper
    */
-  Expr eliminateQuantifiers(Expr cond, ExprSet& vars)
+  inline static Expr eliminateQuantifiers(Expr cond, ExprSet& vars)
   {
     ExprFactory &efac = cond->getFactory();
     SMTUtils u(efac);
@@ -1478,12 +1479,27 @@ namespace ufo
             else ++it1;
 
       if (emptyIntersect(av, vars)) ++it;
-        else it = cnj.erase(it);
+      else it = cnj.erase(it);
     }
     return simplifyBool(conjoin(cnj, efac));
   };
 
-  Expr abduce (Expr goal, Expr assm)
+  inline static Expr eliminateQuantifiers(Expr cond, ExprVector& vars)
+  {
+    ExprSet varsSet;
+    for (auto & v : vars) varsSet.insert(v);
+    return eliminateQuantifiers(cond, varsSet);
+  }
+
+  inline static Expr keepQuantifiers(Expr cond, ExprVector& vars)
+  {
+    ExprSet varsSet;
+    filter (cond, bind::IsConst (), inserter(varsSet, varsSet.begin()));
+    minusSets(varsSet, vars);
+    return eliminateQuantifiers(cond, varsSet);
+  }
+
+  inline static Expr abduce (Expr goal, Expr assm)
   {
     ExprFactory &efac = goal->getFactory();
     SMTUtils u(efac);
@@ -1516,6 +1532,11 @@ namespace ufo
       return NULL;
     }
     return tmp;
+  }
+
+  inline static bool qeUnsupported (Expr e)
+  {
+    return (isNonlinear(e) /* || containsOp<MOD>(e)  || containsOp<DIV>(e) */|| containsOp<ARRAY_TY>(e));
   }
 }
 
