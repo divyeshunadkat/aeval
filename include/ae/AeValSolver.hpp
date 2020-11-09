@@ -591,10 +591,10 @@ namespace ufo
     Expr plusEps(Expr e, bool isInt = true)
     {
       if (isOpX<MPZ>(e) && isInt)
-        return mkMPZ(c + boost::lexical_cast<cpp_int> (e), efac);
-      
-      Expr ce = isInt ? mkMPZ(c, efac) :
-                        mkTerm (mpq_class (lexical_cast<string>(c)), efac);
+        return mkMPZ(boost::lexical_cast<cpp_int> (e) + 1, efac);
+
+      Expr ce = isInt ? mkMPZ(1, efac) :
+                        mkTerm (mpq_class (lexical_cast<string>(1)), efac);
       return mk<PLUS>(e, ce);
     }
 
