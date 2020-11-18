@@ -16,7 +16,7 @@
 
 (declare-rel inv0 ((Array Int Int) Int Int Int Int Int Int))
 (declare-rel inv1 ((Array Int Int) Int Int Int Int Int Int))
-(declare-rel inv2 ((Array Int Int) Int Int Int Int Int))
+(declare-rel inv2 ((Array Int Int) Int Int Int Int Int Int))
 (declare-rel fail ())
 
 (rule (inv0 a 0 0 10 5 n elem))
@@ -26,7 +26,7 @@
   (= j1 (mod (+ j 1) 10))
   (= a0 (ite (= i x) (store a1 j1 (+ (select a1 j1) 1)) a1))
   (= x1 (* x 2))
-  (= i1 (+ i 1))) (inv0 a0 i1 j1 C1 C2 x1 n (select a0 i))))
+  (= i1 (+ i 1))) (inv0 a0 i1 j1 C1 x1 n (select a0 i))))
 
 (rule (=> (and (inv0 a i j C1 x n elem) (>= i n)) (inv1 a2 0 0 C1 5 n elem)))
 
@@ -41,7 +41,7 @@
 
 (rule (=> (and (inv2 a1 i j C1 xp n elem) (> i (div n 2))
   (= a2 (store a1 i C1))
-  (= jp1 (mod (+ j 1) 10))
+  (= j1 (mod (+ j 1) 10))
   (= a0 (ite (= i x) (store a2 j1 (+ (select a2 j1) 1)) a1))
   (= xp1 (* xp 2))
   (= i1 (+ i 1))) (inv2 a0 i1 j1 C1 xp1 n (select a0 i))))

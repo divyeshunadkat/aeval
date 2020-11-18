@@ -28,7 +28,7 @@
 
 (rule (=> (and (inv1 a1 i C1 C2 n elem) (>= i (div n 2))) (inv2 a1 i C1 C2 n elem))) 
 
-(rule (=> (and (inv21 a i C1 C2 n elem) (< i n)
+(rule (=> (and (inv2 a i C1 C2 n elem) (< i n)
   (= a2 (store a1 i (+ (* i C2) C1)))
   (= i1 (+ i 1))) (inv2 a2 i1 C1 C2 n (select a2 i)) ))
 

@@ -23,7 +23,7 @@
   (= a1 (store a i C1))
   (= a0 (ite (= i x) (store a1 x x) a1))
   (= x1 (ite (= i x) (+ x 5) x))
-  (= i1 (+ i 1))) (inv0 a0 i1 C1 C2 x1 n (select a0 i))))
+  (= i1 (+ i 1))) (inv0 a0 i1 C1 x1 n (select a0 i))))
 
 (rule (=> (and (inv0 a i C1 x n elem) (>= i n)) (inv1 a2 0 C1 5 n elem)))
 
