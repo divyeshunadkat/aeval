@@ -29,12 +29,6 @@ namespace apara
     inline map<int, Expr>& getPreConds() { return preconds; }
     inline map<int, Expr>& getPostConds() { return postconds; }
 
-    inline bool checkAccesses() {
-      KSynthesizer ksynth(m_efac, ruleManager, getDecls(), getIterators(),
-                          getIterGrows(), getPreConds(), getPostConds(), o);
-      return ksynth.checkAllAccesses();
-    }
-
   };
 
 }

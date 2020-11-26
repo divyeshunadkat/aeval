@@ -52,6 +52,8 @@ namespace apara
 
     bool bootstrapInvs()
     {
+      if(o.getVerbosity() > 1)
+        cout << "\n\nBootstrapping Invariants\n\n";
       if(ds.bootstrap()) return true;
       if(o.getVerbosity() > 1) ds.printSolution();
       return false;
@@ -59,12 +61,16 @@ namespace apara
 
     void learnInvs()
     {
+      if(o.getVerbosity() > 1)
+        cout << "\n\nLearning Invariants \n\n";
       std::srand(std::time(0));
       ds.synthesize(maxAttempts, (char*)"");
     }
 
     void transformCHCs()
     {
+      if(o.getVerbosity() > 1)
+        cout << "\n\nTransforming CHCs for output \n\n";
       for (auto & hr : ruleManager.chcs)
       {
         if(hr.isFact || hr.isQuery) continue;
@@ -78,6 +84,8 @@ namespace apara
 
     void getSimplifiedInvExpr()
     {
+      if(o.getVerbosity() > 1)
+        cout << "\n\nSimplifying Invariant Expressions \n\n";
       for (int i = 0; i < ds.getDecls().size(); i++)
       {
         Expr rel = ds.getDecls()[i];
@@ -97,8 +105,8 @@ namespace apara
           {
               if(qvar == hr.srcVars[h])
                 outs () << "Original iterator variable:" << *(hr.origSrcArgs[h]) << "\n\n";
-            }
           }
+        }
         */
         Expr tmp = conjoin(lms, m_efac);
         if (!containsOp<FORALL>(tmp)) u.removeRedundantConjuncts(lms);
@@ -138,12 +146,20 @@ namespace apara
     bool makeParallel()
     {
       if(o.getVerbosity() > 1) outs () << "\nInvoked the Parallelization Engine\n";
-      bool bs = bootstrapInvs();
-      ds.checkAccesses();
-      if(!bs) learnInvs();
+      KSynthesizer ksynth(m_efac, ruleManager, ds.getDecls(), ds.getIterators(),
+                          ds.getIterGrows(), ds.getPreConds(), ds.getPostConds(), o);
+      bool co = ksynth.checkOverlap();
+      if(!co) {
+        bool ca = ksynth.runKSynthesizer();
+      } else {
+        bool bs = bootstrapInvs();
+        if(!bs) learnInvs();
+      }
+      /*
       getSimplifiedInvExpr();
       transformCHCs();
       outputParallelVersion();
+      */
       return parallelized;
     }
 

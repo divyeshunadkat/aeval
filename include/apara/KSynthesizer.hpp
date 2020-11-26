@@ -72,18 +72,70 @@ namespace apara
                       map<Expr, ExprVector>& arrSelectAccess)
     {
       if(o.getVerbosity() > 10) outs () << "\nFetching Array Accesses\n";
-      if (select && isOpX<SELECT>(term))
+      if (isOpX<SELECT>(term)) {
         arrSelectAccess[term->left()].push_back(term->right());
-      else if (!select && isOpX<STORE>(term))
+        if(o.getVerbosity() > 5)
+          outs () << "Array Select Access:" << *term->left() << "\t Iteration Access: " << *term->right() << "\n\n";
+        for (auto it = term->args_begin(), end = term->args_end(); it != end; ++it)
+          getArrAccess(*it, arrStoreAccess, arrSelectAccess);
+      } else if (isOpX<STORE>(term)) {
         arrStoreAccess[term->left()].push_back(term->right());
-      else
+        if(o.getVerbosity() > 5)
+          outs () << "Array Store Access:" << *term->left() << "\t Iteration Access: " << *term->right() << "\n\n";
+        for (auto it = term->args_begin(), end = term->args_end(); it != end; ++it)
+          getArrAccess(*it, arrStoreAccess, arrSelectAccess);
+      } else
         for (auto it = term->args_begin(), end = term->args_end(); it != end; ++it)
           getArrAccess(*it, arrStoreAccess, arrSelectAccess);
     }
 
+    void populateITESNAccess()
+    {
+      if(o.getVerbosity() > 10) outs () << "\nPopulating ITEs\n";
+      for (auto & hr : ruleManager.chcs) {
+        if (hr.isFact || hr.isQuery || hr.srcRelation != hr.dstRelation) continue;
+        int invNum = getVarIndex(hr.srcRelation, decls);
+        if(invNum < 0) continue;
+        getITES(hr.body, itesPerLoop[invNum]);
+        for(int i=0; i<itesPerLoop[invNum].size(); i++) {
+          if(o.getVerbosity() > 2) outs () << "ITE:" << *itesPerLoop[invNum][i] << "\n";
+          getArrAccess(itesPerLoop[invNum][i]->right(),
+                       arrStoreAccessInITEBr[itesPerLoop[invNum][i]][0],
+                       arrSelectAccessInITEBr[itesPerLoop[invNum][i]][0]);
+          getArrAccess(itesPerLoop[invNum][i]->last(),
+                       arrStoreAccessInITEBr[itesPerLoop[invNum][i]][1],
+                       arrSelectAccessInITEBr[itesPerLoop[invNum][i]][1]);
+          map<Expr, ExprVector>::iterator it = arrStoreAccessInITEBr[itesPerLoop[invNum][i]][0].begin();
+          while (it != arrStoreAccessInITEBr[itesPerLoop[invNum][i]][0].end()) {
+            for (auto & e : it->second)
+              arrStoreAccessInITE[itesPerLoop[invNum][i]][it->first].push_back(e);
+            it++;
+          }
+          it = arrStoreAccessInITEBr[itesPerLoop[invNum][i]][1].begin();
+          while (it != arrStoreAccessInITEBr[itesPerLoop[invNum][i]][1].end()) {
+            for (auto & e : it->second)
+              arrStoreAccessInITE[itesPerLoop[invNum][i]][it->first].push_back(e);
+            it++;
+          }
+          it = arrSelectAccessInITEBr[itesPerLoop[invNum][i]][0].begin();
+          while (it != arrSelectAccessInITEBr[itesPerLoop[invNum][i]][0].end()) {
+            for (auto & e : it->second)
+              arrSelectAccessInITE[itesPerLoop[invNum][i]][it->first].push_back(e);
+            it++;
+          }
+          it = arrSelectAccessInITEBr[itesPerLoop[invNum][i]][1].begin();
+          while(it != arrSelectAccessInITEBr[itesPerLoop[invNum][i]][1].end()) {
+            for (auto & e : it->second)
+              arrSelectAccessInITE[itesPerLoop[invNum][i]][it->first].push_back(e);
+            it++;
+          }
+        }
+      }
+    }
+
     void populateOutsideAccessLists()
     {
-      if(o.getVerbosity() > 1) outs () << "\nPopulating Lists of Access Outside ITEs\n";
+      if(o.getVerbosity() > 10) outs () << "\nPopulating Lists of Access Outside ITEs\n";
       for (int invNum=0; invNum<decls.size(); invNum++) {
         map<Expr, ExprVector>::iterator allstoit = allArrStoreAccess[invNum].begin();
         while(allstoit != allArrStoreAccess[invNum].end()) {
@@ -133,9 +185,47 @@ namespace apara
       }
     }
 
-    void runKSynth()
+    // Assumes all array indices are from the same statement
+    // TODO: Seperate design for multiple statements in a single loop
+    // TODO: Handles only constant difference in indices. Need to handle variables shifts
+    // TODO: Algorithm optimization??
+    bool checkOverlappingIndices(const int invNum)
     {
-      if(o.getVerbosity() > 1) outs () << "\nGenerating Formulas for K Synth\n";
+      if(o.getVerbosity() > 5) outs () << "\n\nCheck for overlap in array indices\n\n";
+      bool result = false;
+      Expr CVar = bind::intConst(mkTerm<string> ("_APARA_C_", m_efac));
+      map<Expr, ExprVector>::iterator itst  = allArrStoreAccess[invNum].begin();
+      map<Expr, ExprVector>::iterator itsel = allArrSelectAccess[invNum].begin();
+      while (itst != allArrStoreAccess[invNum].end()) {
+        itsel = allArrSelectAccess[invNum].begin();
+        while (itsel != allArrSelectAccess[invNum].end()) {
+          if(o.getVerbosity() > 5)
+            outs () << "\nStoreArr: " << itst->first
+                    << "\nSelectArr: " << itsel->first << "\n";
+          if(itst->first != itsel->first) { itsel++; outs () << "Continue\n"; continue; }
+          for(auto & e1 : itst->second) {
+            for(auto & e2 : itsel->second) {
+              Expr e = mk<AND>(mk<GT>(CVar, mkTerm(mpz_class (0), m_efac)),
+                               mk<EQ>(e1, mk<PLUS>(e2, CVar)));
+              result = bool(u.isSat(e));
+              if(o.getVerbosity() > 5)
+                outs () << "\n\nOverlap Query: " << e << "\nResult: " << result << "\n\n";
+              if(result) break;
+            }
+            if(result) break;
+          }
+          if(result) break;
+          itsel++;
+        }
+        if(result) break;
+        itst++;
+      }
+      return result;
+    }
+
+    bool runKSynth()
+    {
+      if(o.getVerbosity() > 1) outs () << "\nPerforming K Synthesis\n";
       for (auto & hr : ruleManager.chcs) {
         if (hr.isFact || hr.isQuery || hr.srcRelation != hr.dstRelation) continue;
         int invNum = getVarIndex(hr.srcRelation, decls);
@@ -144,8 +234,8 @@ namespace apara
         // generateFM(invNum);
         // generateKSynthFormulas(invNum);
         // synthesizeK(invNum);
-
       }
+      return true;
     }
 
     ExprVector encode(const int invNum)
@@ -207,50 +297,6 @@ namespace apara
       res.push_back(k3Var);
       res.push_back(k4Var);
       return res;
-    }
-
-    void populateITESNAccess()
-    {
-      if(o.getVerbosity() > 1) outs () << "\nPopulating ITEs\n";
-      for (auto & hr : ruleManager.chcs) {
-        if (hr.isFact || hr.isQuery || hr.srcRelation != hr.dstRelation) continue;
-        int invNum = getVarIndex(hr.srcRelation, decls);
-        if(invNum < 0) continue;
-        getITES(hr.body, itesPerLoop[invNum]);
-        for(int i=0; i<itesPerLoop[invNum].size(); i++) {
-          if(o.getVerbosity() > 2) outs () << "ITE:" << *itesPerLoop[invNum][i] << "\n";
-          getArrAccess(itesPerLoop[invNum][i]->right(),
-                       arrStoreAccessInITEBr[itesPerLoop[invNum][i]][0],
-                       arrSelectAccessInITEBr[itesPerLoop[invNum][i]][0]);
-          getArrAccess(itesPerLoop[invNum][i]->last(),
-                       arrStoreAccessInITEBr[itesPerLoop[invNum][i]][1],
-                       arrSelectAccessInITEBr[itesPerLoop[invNum][i]][1]);
-          map<Expr, ExprVector>::iterator it = arrStoreAccessInITEBr[itesPerLoop[invNum][i]][0].begin();
-          while (it != arrStoreAccessInITEBr[itesPerLoop[invNum][i]][0].end()) {
-            for (auto & e : it->second)
-              arrStoreAccessInITE[itesPerLoop[invNum][i]][it->first].push_back(e);
-            it++;
-          }
-          it = arrStoreAccessInITEBr[itesPerLoop[invNum][i]][1].begin();
-          while (it != arrStoreAccessInITEBr[itesPerLoop[invNum][i]][1].end()) {
-            for (auto & e : it->second)
-              arrStoreAccessInITE[itesPerLoop[invNum][i]][it->first].push_back(e);
-            it++;
-          }
-          it = arrSelectAccessInITEBr[itesPerLoop[invNum][i]][0].begin();
-          while (it != arrSelectAccessInITEBr[itesPerLoop[invNum][i]][0].end()) {
-            for (auto & e : it->second)
-              arrSelectAccessInITE[itesPerLoop[invNum][i]][it->first].push_back(e);
-            it++;
-          }
-          it = arrSelectAccessInITEBr[itesPerLoop[invNum][i]][1].begin();
-          while(it != arrSelectAccessInITEBr[itesPerLoop[invNum][i]][1].end()) {
-            for (auto & e : it->second)
-              arrSelectAccessInITE[itesPerLoop[invNum][i]][it->first].push_back(e);
-            it++;
-          }
-        }
-      }
     }
 
     void generateFM(const int invNum)
@@ -518,21 +564,21 @@ namespace apara
       return mkMPZ(-1, m_efac);
     }
 
-    bool checkAllAccessesProt()
+    bool checkOverlapFn()
     {
-      if(o.getVerbosity() > 1) outs () << "\nChecking Array Accesses\n";
       populateAccesses();
-      runKSynth();
-
-      for (auto & hr : ruleManager.chcs)
-      {
+      if(o.getVerbosity() > 1) outs () << "\nChecking Overlap in Array Accesses\n";
+      for (auto & hr : ruleManager.chcs) {
         if (hr.isFact || hr.isQuery || hr.srcRelation != hr.dstRelation) continue;
         int invNum = getVarIndex(hr.srcRelation, decls);
         if(invNum < 0) continue;
+        bool overlap = checkOverlappingIndices(invNum);
+        if(overlap) {
+          outs () << "\n**Overlapping indices are present in array accesses**\n";
+          return true;
+        }
       }
-
-      if(o.getVerbosity() > 1) outs () << "\nAll Accesses Checked\n";
-      return true;
+      return false;
     }
 
   public:
@@ -542,7 +588,8 @@ namespace apara
       m_efac(efac), ruleManager(r), decls(d), iterators(iters), iterGrows(iterg),
       preconds(prec), postconds(postc), o(opt), u(efac) {}
 
-    inline bool checkAllAccesses() { return checkAllAccessesProt(); }
+    inline bool checkOverlap() { return checkOverlapFn(); }
+    inline bool runKSynthesizer() { return runKSynth(); }
 
   };
 
