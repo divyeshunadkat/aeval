@@ -5,16 +5,16 @@
 (declare-var i Int)
 (declare-var i1 Int)
 (declare-var n Int)
-(declare-rel inv ((Array Int Int) (Array Int Int) Int Int))
+(declare-rel inv ((Array Int Int) (Array Int Int) (Array Int Int) Int Int))
 (declare-rel fail ())
 
-(rule (inv x y 0 n))
+(rule (inv x y z 0 n))
 
-(rule (=> (and (inv x y i n) (< i n)
+(rule (=> (and (inv x y z i n) (< i n)
   (= x1 (store x i (* (select z i) (- (select y i) (select x (- i 1))))))
-  (= i1 (+ i 1))) (inv x1 y i1 n)))
+  (= i1 (+ i 1))) (inv x1 y z i1 n)))
 
-(rule (=> (and (inv x y i n) (not (< i n)) true) fail))
+(rule (=> (and (inv x y z i n) (not (< i n)) true) fail))
 
 (query fail)
 
