@@ -23,6 +23,7 @@ namespace apara
     Learner ds;
 
     map<int, Expr> invExpr;
+    map<int, ExprSet> invExprSet;
     int maxAttempts = 2000000;
     bool parallelized = false;
 
@@ -54,17 +55,19 @@ namespace apara
     {
       if(o.getVerbosity() > 1)
         cout << "\n\nBootstrapping Invariants\n\n";
-      if(ds.bootstrap()) return true;
+      bool res = ds.bootstrap();
       if(o.getVerbosity() > 1) ds.printSolution();
-      return false;
+      return res;
     }
 
-    void learnInvs()
+    bool learnInvs()
     {
       if(o.getVerbosity() > 1)
         cout << "\n\nLearning Invariants \n\n";
       std::srand(std::time(0));
       ds.synthesize(maxAttempts, (char*)"");
+      if(o.getVerbosity() > 1) ds.printSolution();
+      return true;
     }
 
     void transformCHCs()
@@ -115,6 +118,35 @@ namespace apara
       }
     }
 
+    void getEqualityInvs()
+    {
+      if(o.getVerbosity() > 1) cout << "\n\nFetching Equality Invariants\n\n";
+      for (int i = 0; i < ds.getDecls().size(); i++)
+      {
+        Expr rel = ds.getDecls()[i];
+        SamplFactory& sf = ds.getSFS()[i].back();
+        ExprSet eqInvs;
+        std::set<Expr>::iterator it1, it2;
+        for (it1 = sf.learnedExprs.begin(); it1 != sf.learnedExprs.end(); ++it1) {
+          for (it2 = sf.learnedExprs.begin(); it2 != sf.learnedExprs.end(); ++it2) {
+            if(it1 == it2) continue;
+            Expr e1 = *it1, e2 = *it2;
+            if (!(containsOp<FORALL>(e1) && containsOp<FORALL>(e2))) continue;
+            if (e1->arity() != e2->arity()) continue;
+            if (!(isOpX<IMPL>(e1->last()) && isOpX<IMPL>(e2->last()))) continue;
+            if (!u.checkSameExpr(e1->last()->left(), e2->last()->left())) continue;
+            //isIntConst(e1->last()->right(), e2->last()->right());
+            if(o.getVerbosity() > 1) {
+              outs () << "\n\nIdentified the following two expressions that form a equality\n\n";
+              u.print(e1); outs () << "\n\n"; u.print(e2);
+            }
+            // eqInvs.insert( changeOperatortoEQ(e1) );
+          }
+        }
+        invExprSet[i] = eqInvs;
+      }
+    }
+
     bool outputParallelVersion()
     {
       if (!parallelized) {
@@ -153,14 +185,31 @@ namespace apara
         bool ca = ksynth.runKSynthesizer();
       } else {
         bool bs = bootstrapInvs();
-        if(!bs) learnInvs();
+        if(!bs) {
+          if(o.getVerbosity() > 1) outs () << "\nBootstrapping worked\n";
+        } else {
+          learnInvs();
+          if(o.getVerbosity() > 1) outs () << "\nInvariant synthesis successful\n";
+        }
       }
+      getEqualityInvs();
+      // printInvs();
       /*
       getSimplifiedInvExpr();
       transformCHCs();
       outputParallelVersion();
       */
       return parallelized;
+    }
+
+    void printInvs(bool simplify = true)
+    {
+      for (int i = 0; i < ds.getDecls().size(); i++)
+      {
+        Expr res = invExpr[i];
+        u.print(res);
+        outs () << "\n\n";
+      }
     }
 
   };

@@ -334,6 +334,9 @@ namespace ufo
       else return "";
     }
 
+    /**
+     * Print the given expression in the smtlib format
+     */
     void print (Expr e)
     {
       if (isOpX<FORALL>(e) || isOpX<EXISTS>(e))
@@ -406,6 +409,9 @@ namespace ufo
       else outs () << z3.toSmtLib (e);
     }
 
+    /**
+     * Convert the given expression into a string in smtlib format
+     */
     string exprToSmtlibStr (const Expr & e)
     {
       ostringstream smtString;
@@ -503,6 +509,9 @@ namespace ufo
       return smtString.str();
     }
 
+    /**
+     * Convert the given relation expression and its arguments  into a string in smtlib format
+     */
     string relSmtlibStr (const Expr & rel, const ExprVector & args)
     {
       //assert(rel != NULL);
@@ -513,6 +522,76 @@ namespace ufo
       for(auto &a: args) relSmtStr << *a << ", ";
       relSmtStr << ")";
       return relSmtStr.str();
+    }
+
+
+    /**
+     * TODO: Check if the given pair of expression are same or not
+     * WIP !!
+     */
+    bool checkSameExpr(Expr e1, Expr e2)
+    {
+      if ( (isOpX<FORALL>(e1) && isOpX<FORALL>(e2)) ||
+           (isOpX<EXISTS>(e1) && isOpX<EXISTS>(e2)) )
+      {
+        if(e1->arity() != e2->arity()) return false;
+        for (int i = 0; i < e1->arity()-1; i++) {
+          Expr var1 = bind::fapp(e1->arg(i));
+          Expr var2 = bind::fapp(e2->arg(i));
+          // How to check that two formulas have mapped variables?
+          // if(!checkSameExpr(var1, var2)) return false;
+        }
+        return checkSameExpr(e1->last(), e2->last());
+      }
+      else if (isOpX<AND>(e1) && isOpX<AND>(e2))
+      {
+        ExprSet cnjs1, cnjs2;
+        getConj(e1, cnjs1);
+        getConj(e2, cnjs2);
+        if(cnjs1.size() != cnjs2.size()) return false;
+        // How to check that two sets have the same formulas?
+        return true;
+      }
+      else if (isOpX<OR>(e1) && isOpX<OR>(e2))
+      {
+        ExprSet dsjs1, dsjs2;
+        getDisj(e1, dsjs1);
+        getDisj(e2, dsjs2);
+        if(dsjs1.size() != dsjs2.size()) return false;
+        // How to check that two sets have the same formulas?
+        return true;
+      }
+      else if ((isOpX<IMPL>(e1) && isOpX<IMPL>(e2)) ||
+               (isOp<ComparissonOp>(e1) && isOp<ComparissonOp>(e2)))
+      {
+        if (!(isOpX<IMPL>(e1) && isOpX<IMPL>(e2))) return false;
+        if (!(isOpX<EQ>(e1) && isOpX<EQ>(e2))) return false;
+        if (!(isOpX<GEQ>(e1) && isOpX<GEQ>(e2))) return false;
+        if (!(isOpX<LEQ>(e1) && isOpX<LEQ>(e2))) return false;
+        if (!(isOpX<LT>(e1) && isOpX<LT>(e2))) return false;
+        if (!(isOpX<GT>(e1) && isOpX<GT>(e2))) return false;
+        if (!(isOpX<NEQ>(e1) && isOpX<NEQ>(e2))) return false;
+        if (!checkSameExpr(e1->left(), e2->left())) return false;
+        if (!checkSameExpr(e1->right(), e2->right())) return false;
+        return true;
+      }
+      else if (isOpX<ITE>(e1) && isOpX<ITE>(e2))
+      {
+        if(!checkSameExpr(e1->left(), e2->left())) return false;
+        if(!checkSameExpr(e1->right(), e2->right())) return false;
+        if(!checkSameExpr(e1->last(), e2->last())) return false;
+        return true;
+      }
+      else if ((isOpX<STORE>(e1) && isOpX<STORE>(e2)) ||
+               (isOpX<SELECT>(e1) && isOpX<SELECT>(e2)) )
+      {
+        if(e1->arity() != e2->arity()) return false;
+        for (int i = 0; i < e1->arity(); i++)
+        {
+          return checkSameExpr(e1->arg(i), e2->arg(i));
+        }
+      }
+      else return false;
     }
 
     void serialize_formula(Expr form)
