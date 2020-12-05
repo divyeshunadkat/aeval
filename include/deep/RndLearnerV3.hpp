@@ -263,6 +263,7 @@ namespace ufo
 
     bool addCandidate(int invNum, Expr cnd)
     {
+      if (printLog) outs () << "Inside addCandidate\n";
       SamplFactory& sf = sfs[invNum].back();
       Expr allLemmas = sf.getAllLemmas();
       if (containsOp<FORALL>(cnd) || containsOp<FORALL>(allLemmas))
@@ -408,9 +409,13 @@ namespace ufo
 
     bool checkCand(int invNum)
     {
+      if(printLog) outs () << "Inside checkCand\n";
       Expr rel = decls[invNum];
       if (!checkInit(rel)) return false;
+      if(printLog) outs () << "After checkInit\n";
+
       if (!checkInductiveness(rel)) return false;
+      if(printLog) outs () << "After checkInductiveness\n";
 
       return propagate(invNum, conjoin(candidates[invNum], m_efac), false);
     }
@@ -1123,11 +1128,15 @@ namespace ufo
 
     bool bootstrap()
     {
+      if (printLog) outs () << "Inside boostrap\n";
       filterUnsat();
+      if (printLog) outs () << "After filterUnsat in bootstrap\n";
 
       if (multiHoudini(ruleManager.wtoCHCs))
       {
+        if (printLog) outs () << "After multiHoudini in bootstrap\n";
         assignPrioritiesForLearned();
+        if (printLog) outs () << "After assignPriorities in bootstrap\n";
         if (checkAllLemmas())
         {
           outs () << "Success after bootstrapping\n";
@@ -1154,10 +1163,14 @@ namespace ufo
 
             auto candidatesTmp = candidates[invNum]; // save for later
             if (!addCandidate(invNum, cand)) continue;
+            if (printLog) outs () << "After addCandidate returned to bootstrap\n";
+
             if (checkCand(invNum))
             {
               assignPrioritiesForLearned();
+              if (printLog) outs () << "After assignPriorities in loop\n";
               generalizeArrInvars(sf);
+              if (printLog) outs () << "After generalizeArrInvars in loop\n";
               if (checkAllLemmas())
               {
                 outs () << "Success after bootstrapping\n";
@@ -1196,7 +1209,9 @@ namespace ufo
         }
         if (multiHoudini(ruleManager.wtoCHCs))
         {
+          if (printLog) outs () << "After multiHoudini in second round of bootstrap\n";
           assignPrioritiesForLearned();
+          if (printLog) outs () << "After assignPriorities in second round of bootstrap\n";
           if (checkAllLemmas())
           {
             outs () << "Success after bootstrapping\n";
@@ -1223,6 +1238,7 @@ namespace ufo
 
     bool checkAllLemmas()
     {
+      if (printLog) outs () << "Inside checkAllLemmas\n";
       candidates.clear();
       for (int i = ruleManager.wtoCHCs.size() - 1; i >= 0; i--)
       {
@@ -1242,15 +1258,23 @@ namespace ufo
               for (auto & l : lms) candidates[i].push_back(l);
             }
             multiHoudini(ruleManager.wtoCHCs);
-            assignPrioritiesForLearned();
+            if (printLog) outs () << "After multiHoudini in checkAllLemmas\n";
 
+            assignPrioritiesForLearned();
+            if (printLog) outs () << "After assignPriorities in checkAllLemmas\n";
+
+            if (printLog) outs () << "Exiting checkAllLemmas\n";
             return false;
             assert(0);    // only queries are allowed to fail
           }
           else
+          {
+            if (printLog) outs () << "Exiting checkAllLemmas\n";
             return false; // TODO: use this fact somehow
+          }
         }
       }
+      if (printLog) outs () << "Exiting checkAllLemmas\n";
       return true;
     }
 

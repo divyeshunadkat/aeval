@@ -574,7 +574,8 @@ namespace apara
         if(invNum < 0) continue;
         bool overlap = checkOverlappingIndices(invNum);
         if(overlap) {
-          outs () << "\n**Overlapping indices are present in array accesses**\n";
+          if(o.getVerbosity() > 2)
+            outs () << "\n**Overlapping indices are present in array accesses**\n";
           return true;
         }
       }

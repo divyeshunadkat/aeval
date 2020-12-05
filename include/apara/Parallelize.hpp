@@ -128,17 +128,25 @@ namespace apara
         ExprSet eqInvs;
         std::set<Expr>::iterator it1, it2;
         for (it1 = sf.learnedExprs.begin(); it1 != sf.learnedExprs.end(); ++it1) {
-          for (it2 = sf.learnedExprs.begin(); it2 != sf.learnedExprs.end(); ++it2) {
+          for (it2 = it1; it2 != sf.learnedExprs.end(); ++it2) {
             if(it1 == it2) continue;
             Expr e1 = *it1, e2 = *it2;
             if (!(containsOp<FORALL>(e1) && containsOp<FORALL>(e2))) continue;
             if (e1->arity() != e2->arity()) continue;
             if (!(isOpX<IMPL>(e1->last()) && isOpX<IMPL>(e2->last()))) continue;
-            if (!u.checkSameExpr(e1->last()->left(), e2->last()->left())) continue;
-            //isIntConst(e1->last()->right(), e2->last()->right());
+
+            // Following is available by construction for single loop CHC programs
+            // if (!u.checkSameExpr(e1->last()->left(), e2->last()->left())) continue;
+            // TODO: Support the above for multiple loops
+            Expr impl1 = e1->last(), impl2 = e2->last();
+            if (!(isOp<ComparissonOp>(impl1->last()) &&
+                  isOp<ComparissonOp>(impl2->last())) ) continue;
+            if(!u.isSat(mk<EQ>(mkMPZ(0, m_efac), mk<PLUS>(impl1->last()->left(), impl2->last()->left())),
+                        mk<EQ>(mkMPZ(0, m_efac), mk<PLUS>(impl1->last()->right(), impl2->last()->right())))) continue;
+            // isIntConst(e1->last()->right(), e2->last()->right());
             if(o.getVerbosity() > 1) {
               outs () << "\n\nIdentified the following two expressions that form a equality\n\n";
-              u.print(e1); outs () << "\n\n"; u.print(e2);
+              u.print(impl1->last()); outs () << "\n\n"; u.print(impl2->last());
             }
             // eqInvs.insert( changeOperatortoEQ(e1) );
           }
@@ -172,6 +180,7 @@ namespace apara
       o(opt), ds(m_efac, m_z3, ruleManager, false, false, o)
     {
       ruleManager.parse(o.getInputFile());
+      if(o.getVerbosity() > 1) ds.setPrintLog(true);
       initializeLearner();
     }
 
@@ -188,6 +197,7 @@ namespace apara
         if(!bs) {
           if(o.getVerbosity() > 1) outs () << "\nBootstrapping worked\n";
         } else {
+          if(o.getVerbosity() > 1) outs () << "\nInvariant synthesis invoked\n";
           learnInvs();
           if(o.getVerbosity() > 1) outs () << "\nInvariant synthesis successful\n";
         }

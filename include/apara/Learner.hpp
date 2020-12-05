@@ -28,6 +28,7 @@ namespace apara
     inline map<int, bool>& getIterGrows() { return iterGrows; }
     inline map<int, Expr>& getPreConds() { return preconds; }
     inline map<int, Expr>& getPostConds() { return postconds; }
+    inline void setPrintLog(bool pLog) { printLog = pLog; }
 
   };
 
