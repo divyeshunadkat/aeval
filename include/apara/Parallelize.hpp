@@ -143,6 +143,8 @@ namespace apara
                   isOp<ComparissonOp>(impl2->last())) ) continue;
             if(!u.isSat(mk<EQ>(mkMPZ(0, m_efac), mk<PLUS>(impl1->last()->left(), impl2->last()->left())),
                         mk<EQ>(mkMPZ(0, m_efac), mk<PLUS>(impl1->last()->right(), impl2->last()->right())))) continue;
+            if(u.isSat(mk<NEQ>(mkMPZ(0, m_efac), mk<PLUS>(impl1->last()->left(), impl2->last()->left())))) continue;
+            if(u.isSat(mk<NEQ>(mkMPZ(0, m_efac), mk<PLUS>(impl1->last()->right(), impl2->last()->right())))) continue;
             // isIntConst(e1->last()->right(), e2->last()->right());
             if(o.getVerbosity() > 1) {
               outs () << "\n\nIdentified the following two expressions that form a equality\n\n";
