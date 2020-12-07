@@ -539,7 +539,11 @@ namespace ufo
     typedef ZModel<Z> Model;
 
     ZSolver (Z &z) :
-      z3(z), ctx (z.get_ctx ()), solver (z.get_ctx ()), efac (z.get_efac ()) {}
+      z3(z), ctx (z.get_ctx ()), solver (z.get_ctx ()), efac (z.get_efac ()) {
+      ZParams<Z> p(z);
+      p.set("timeout", (unsigned)5000);
+      solver.set(p);
+    }
 
     ZSolver (Z &z, const char *logic) :
       z3(z), ctx (z.get_ctx ()), solver (z.get_ctx (), logic), efac (z.get_efac ()) {}
