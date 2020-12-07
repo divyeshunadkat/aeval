@@ -1107,6 +1107,7 @@ namespace ufo
         for (auto a : tmp2)
         {
           cands[dcl].insert(a);
+          if (printLog) outs () << "\n\nData Candidate: " << *a << "\n\n";
           if (isNumericConst(a->right()))
 
           for (auto b : substs)
@@ -1119,6 +1120,7 @@ namespace ufo
               {
                 Expr e = replaceAll(a, a->right(), mk<MULT>(mkMPZ(i1/i2, m_efac), c));
                 cands[dcl].insert(e);
+                if (printLog) outs () << "\n\nData Candidate: " << *e << "\n\n";
               }
           }
         }
