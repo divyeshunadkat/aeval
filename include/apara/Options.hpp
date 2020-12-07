@@ -22,6 +22,7 @@ namespace apara {
     string outputFilePath;
 
     int verbosity;
+    bool printLog;
     string version = "1.0";
     string toolName = "apara";
 
@@ -31,6 +32,7 @@ namespace apara {
     inline string getOutputFile() { return outputFilePath; }
     inline string getOutputFileName() { return outputFileName; }
     inline int getVerbosity() { return verbosity; }
+    inline int getPrintLog() { return printLog; }
 
     bool parse_config(path configFileName) {
       boost::filesystem::ifstream cfg_file(configFileName);
@@ -106,6 +108,7 @@ namespace apara {
       generic.add_options()
         ("version", "Print version string")
         ("verbose,v", value<int>(&verbosity)->default_value(0), "Set verbosity level")
+        ("log,l", bool_switch(&printLog)->default_value(false), "Enable logging in backend solver")
         ("help,h", "Print help")
         ;
       pd.add("input", -1);

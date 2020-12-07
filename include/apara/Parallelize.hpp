@@ -4,6 +4,7 @@
 #include <fstream>
 #include "apara/Options.hpp"
 #include "apara/Learner.hpp"
+#include "apara/RuleInfoManager.hpp"
 #include "apara/KSynthesizer.hpp"
 
 using namespace std;
@@ -23,12 +24,13 @@ namespace apara
     Learner ds;
 
     map<int, Expr> invExpr;
-    map<int, ExprSet> invExprSet;
+    map<int, ExprSet> eqInvExprSet;
     int maxAttempts = 2000000;
     bool parallelized = false;
 
     void initializeLearner()
     {
+      if(o.getVerbosity() > 1) cout << "\nInitializing Learner\n";
       BndExpl bnd(ruleManager);
       if (!ruleManager.hasCycles())
       {
@@ -53,42 +55,24 @@ namespace apara
 
     bool bootstrapInvs()
     {
-      if(o.getVerbosity() > 1)
-        cout << "\n\nBootstrapping Invariants\n\n";
+      if(o.getVerbosity() > 1) cout << "\nBootstrapping Invariants\n";
       bool res = ds.bootstrap();
-      if(o.getVerbosity() > 1) ds.printSolution();
+      if(o.getVerbosity() > 3) ds.printSolution();
       return res;
     }
 
     bool learnInvs()
     {
-      if(o.getVerbosity() > 1)
-        cout << "\n\nLearning Invariants \n\n";
+      if(o.getVerbosity() > 1) cout << "\nLearning Invariants\n";
       std::srand(std::time(0));
       ds.synthesize(maxAttempts, (char*)"");
-      if(o.getVerbosity() > 1) ds.printSolution();
+      if(o.getVerbosity() > 3) ds.printSolution();
       return true;
-    }
-
-    void transformCHCs()
-    {
-      if(o.getVerbosity() > 1)
-        cout << "\n\nTransforming CHCs for output \n\n";
-      for (auto & hr : ruleManager.chcs)
-      {
-        if(hr.isFact || hr.isQuery) continue;
-        if(hr.srcRelation != hr.dstRelation) continue;
-        int invNum = getVarIndex(hr.srcRelation, ds.getDecls());
-        hr.body = invExpr[invNum];
-      }
-      for (auto & hr : ruleManager.chcs)  // Cannot be merged with loop above due to continue stmts
-        hr.rewriteToOrigVars();
     }
 
     void getSimplifiedInvExpr()
     {
-      if(o.getVerbosity() > 1)
-        cout << "\n\nSimplifying Invariant Expressions \n\n";
+      if(o.getVerbosity() > 1) cout << "\nSimplifying Invariant Expressions\n";
       for (int i = 0; i < ds.getDecls().size(); i++)
       {
         Expr rel = ds.getDecls()[i];
@@ -107,7 +91,7 @@ namespace apara
           for (int h = 0; h < hr.srcVars.size(); h++)
           {
               if(qvar == hr.srcVars[h])
-                outs () << "Original iterator variable:" << *(hr.origSrcArgs[h]) << "\n\n";
+                outs () << "Original iterator variable:" << *(hr.origSrcArgs[h]) << "\n";
           }
         }
         */
@@ -118,9 +102,51 @@ namespace apara
       }
     }
 
-    void getEqualityInvs()
+    void transformCHCs()
     {
-      if(o.getVerbosity() > 1) cout << "\n\nFetching Equality Invariants\n\n";
+      if(o.getVerbosity() > 1) cout << "\nTransforming CHCs for output\n";
+      for (auto & hr : ruleManager.chcs)
+      {
+        if (hr.isFact || hr.isQuery || hr.srcRelation != hr.dstRelation) continue;
+        int invNum = getVarIndex(hr.srcRelation, ds.getDecls());
+        hr.body = invExpr[invNum];
+      }
+      for (auto & hr : ruleManager.chcs)  // Cannot be merged with loop above due to continue stmts
+        hr.rewriteToOrigVars();
+    }
+
+    void printTransformedCHCs()
+    {
+      for (int i = 0; i < ds.getDecls().size(); i++)
+      {
+        u.print(invExpr[i]);
+        outs () << "\n";
+      }
+    }
+
+    bool outputParallelVersion()
+    {
+      if (!parallelized) {
+        if(o.getVerbosity() > 20)
+          cout << "\nUnable to parallelize the given input file " << o.getInputFile() << "\n";
+        return false;
+      }
+      if(o.getVerbosity() > 20)
+        cout << "\nWriting the parallelized version to " << o.getOutputFile() << "\n";
+      std::ofstream outputFileStream;
+      outputFileStream.open(o.getOutputFile());
+      outputFileStream << "#Parallelized version of " << o.getInputFile() << "\n";
+      outputFileStream << ruleManager;
+      outputFileStream.flush();
+      if(o.getVerbosity() > 20)
+        cout << "\nParallelized version written to " << o.getOutputFile() << "\n";
+      return true;
+    }
+
+    bool getEqualityInvs()
+    {
+      if(o.getVerbosity() > 1) cout << "\nFetching Equality Invariants by Merging Ineqs\n";
+      bool result = false;
       for (int i = 0; i < ds.getDecls().size(); i++)
       {
         Expr rel = ds.getDecls()[i];
@@ -134,46 +160,73 @@ namespace apara
             if (!(containsOp<FORALL>(e1) && containsOp<FORALL>(e2))) continue;
             if (e1->arity() != e2->arity()) continue;
             if (!(isOpX<IMPL>(e1->last()) && isOpX<IMPL>(e2->last()))) continue;
-
             // Following is available by construction for single loop CHC programs
             // if (!u.checkSameExpr(e1->last()->left(), e2->last()->left())) continue;
             // TODO: Support the above for multiple loops
             Expr impl1 = e1->last(), impl2 = e2->last();
-            if (!(isOp<ComparissonOp>(impl1->last()) &&
-                  isOp<ComparissonOp>(impl2->last())) ) continue;
-            if(!u.isSat(mk<EQ>(mkMPZ(0, m_efac), mk<PLUS>(impl1->last()->left(), impl2->last()->left())),
-                        mk<EQ>(mkMPZ(0, m_efac), mk<PLUS>(impl1->last()->right(), impl2->last()->right())))) continue;
-            if(u.isSat(mk<NEQ>(mkMPZ(0, m_efac), mk<PLUS>(impl1->last()->left(), impl2->last()->left())))) continue;
-            if(u.isSat(mk<NEQ>(mkMPZ(0, m_efac), mk<PLUS>(impl1->last()->right(), impl2->last()->right())))) continue;
-            // isIntConst(e1->last()->right(), e2->last()->right());
-            if(o.getVerbosity() > 1) {
-              outs () << "\n\nIdentified the following two expressions that form a equality\n\n";
-              u.print(impl1->last()); outs () << "\n\n"; u.print(impl2->last());
+            Expr consequent1 = impl1->last(); Expr consequent2 = impl2->last();
+            if (!(isOp<ComparissonOp>(consequent1) && isOp<ComparissonOp>(consequent2))) continue;
+            if(!u.isSat(mk<EQ>(mkMPZ(0, m_efac),
+                               mk<PLUS>(consequent1->left(), consequent2->left())),
+                        mk<EQ>(mkMPZ(0, m_efac),
+                               mk<PLUS>(consequent1->right(), consequent2->right())))) continue;
+            if(u.isSat(mk<NEQ>(mkMPZ(0, m_efac),
+                               mk<PLUS>(consequent1->left(), consequent2->left())))) continue;
+            if(u.isSat(mk<NEQ>(mkMPZ(0, m_efac),
+                               mk<PLUS>(consequent1->right(), consequent2->right())))) continue;
+            if(o.getVerbosity() > 3) {
+              outs () << "\nIdentified expressions that form a equality\n";
+              u.print(consequent1); outs () << "\n"; u.print(consequent2); outs () << "\n";
             }
-            // eqInvs.insert( changeOperatortoEQ(e1) );
+            Expr eqConsequent = mk<EQ>(consequent1->left(), consequent1->right());
+            Expr eqInv = replaceAll(e1, consequent1, eqConsequent);
+            if(o.getVerbosity() > 3) {
+              outs () << "\nIdentified equality invariant\n";
+              u.print(eqInv); outs () << "\n";
+            }
+            eqInvs.insert( eqInv );
+            result = true;
           }
         }
-        invExprSet[i] = eqInvs;
+        eqInvExprSet[i] = eqInvs;
       }
+      return result;
     }
 
-    bool outputParallelVersion()
+    void applyEqInvToCHCs(RuleInfoManager& rim)
     {
-      if (!parallelized) {
-        if(o.getVerbosity() > 20)
-          cout << "\n\nUnable to parallelize the given input file " << o.getInputFile() << "\n\n";
-        return false;
+      if(o.getVerbosity() > 1) cout << "\nAppling Inferred Equality Invariants to CHCs\n";
+      for (auto & hr : ruleManager.chcs)
+      {
+        if (hr.isFact || hr.isQuery || hr.srcRelation != hr.dstRelation) continue;
+        int invNum = getVarIndex(hr.srcRelation, ds.getDecls());
+        // Report if more than one equality is present
+        if(eqInvExprSet[invNum].size() > 1)
+          if(o.getVerbosity() > 3)
+            outs () << "\nWarning: Multiple equality invariants detected for loop: "
+                    << invNum << "\n";
+        // Fetch inv for this loop/invNum
+        Expr inferredInv = *eqInvExprSet[invNum].begin();
+        map<Expr, ExprVector>::iterator itst = rim.getAllArrStore()[invNum].begin();
+        while (itst != rim.getAllArrStore()[invNum].end())
+        {
+          Expr e1 = itst->first;
+          for(auto & e2 : itst->second) {
+            Expr arr= e2->left();
+            // Check if inv is for the following array
+            Expr ind = e2->right();
+            // Check if the index accessed falls in the range of inv
+            Expr write = e2->last();
+            // Check that indices of each select access are within range the range of inv
+            // and that there was a recurrence going on here
+            // checkIndInRange();
+            // Fetch the inferred value from inv for the rhs expression
+            // Expr val = fetchValInv();
+            // hr.body = replaceAll(hr.body, write, val);
+          }
+          itst++;
+        }
       }
-      if(o.getVerbosity() > 20)
-        cout << "\nWriting the parallelized version to " << o.getOutputFile() << "\n";
-      std::ofstream outputFileStream;
-      outputFileStream.open(o.getOutputFile());
-      outputFileStream << "#Parallelized version of " << o.getInputFile() << "\n\n";
-      outputFileStream << ruleManager;
-      outputFileStream.flush();
-      if(o.getVerbosity() > 20)
-        cout << "\nParallelized version written to " << o.getOutputFile() << "\n\n";
-      return true;
     }
 
   public:
@@ -181,47 +234,35 @@ namespace apara
       m_z3(m_efac), ruleManager(m_efac, m_z3), m_smt_solver (m_z3), u(m_efac),
       o(opt), ds(m_efac, m_z3, ruleManager, false, false, o)
     {
+      ds.setPrintLog(o.getPrintLog());
       ruleManager.parse(o.getInputFile());
-      if(o.getVerbosity() > 1) ds.setPrintLog(true);
       initializeLearner();
     }
 
     bool makeParallel()
     {
       if(o.getVerbosity() > 1) outs () << "\nInvoked the Parallelization Engine\n";
+      RuleInfoManager rim(ruleManager, ds.getDecls(), o);
       KSynthesizer ksynth(m_efac, ruleManager, ds.getDecls(), ds.getIterators(),
-                          ds.getIterGrows(), ds.getPreConds(), ds.getPostConds(), o);
+                          ds.getIterGrows(), ds.getPreConds(), ds.getPostConds(),
+                          rim, o);
       bool co = ksynth.checkOverlap();
       if(!co) {
-        bool ca = ksynth.runKSynthesizer();
+        bool rks = ksynth.runKSynthesizer();
       } else {
         bool bs = bootstrapInvs();
-        if(!bs) {
-          if(o.getVerbosity() > 1) outs () << "\nBootstrapping worked\n";
-        } else {
-          if(o.getVerbosity() > 1) outs () << "\nInvariant synthesis invoked\n";
-          learnInvs();
-          if(o.getVerbosity() > 1) outs () << "\nInvariant synthesis successful\n";
-        }
+        if(bs) learnInvs();
+        bool ei = getEqualityInvs();
+        if(ei) applyEqInvToCHCs(rim);
+        else return false;
       }
-      getEqualityInvs();
-      // printInvs();
       /*
       getSimplifiedInvExpr();
       transformCHCs();
+      printTransformedCHCs();
       outputParallelVersion();
       */
       return parallelized;
-    }
-
-    void printInvs(bool simplify = true)
-    {
-      for (int i = 0; i < ds.getDecls().size(); i++)
-      {
-        Expr res = invExpr[i];
-        u.print(res);
-        outs () << "\n\n";
-      }
     }
 
   };

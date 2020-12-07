@@ -526,23 +526,23 @@ namespace ufo
 
 
     /**
-     * TODO: Check if the given pair of expression are same or not
-     * WIP !!
+     * Check if the given pair of expression are same or not
      */
     bool checkSameExpr(Expr e1, Expr e2)
     {
-      if ( (isOpX<FORALL>(e1) && isOpX<FORALL>(e2)) ||
+      if (e1 == e2) return true;
+      else if ( (isOpX<FORALL>(e1) && isOpX<FORALL>(e2)) ||
            (isOpX<EXISTS>(e1) && isOpX<EXISTS>(e2)) )
       {
         if(e1->arity() != e2->arity()) return false;
         for (int i = 0; i < e1->arity()-1; i++) {
           Expr var1 = bind::fapp(e1->arg(i));
           Expr var2 = bind::fapp(e2->arg(i));
-          // How to check that two formulas have mapped variables?
-          // if(!checkSameExpr(var1, var2)) return false;
+          if (!(var1 == var2)) return false;
         }
         return checkSameExpr(e1->last(), e2->last());
       }
+      /*
       else if (isOpX<AND>(e1) && isOpX<AND>(e2))
       {
         ExprSet cnjs1, cnjs2;
@@ -561,6 +561,7 @@ namespace ufo
         // How to check that two sets have the same formulas?
         return true;
       }
+      */
       else if ((isOpX<IMPL>(e1) && isOpX<IMPL>(e2)) ||
                (isOp<ComparissonOp>(e1) && isOp<ComparissonOp>(e2)))
       {
@@ -587,9 +588,7 @@ namespace ufo
       {
         if(e1->arity() != e2->arity()) return false;
         for (int i = 0; i < e1->arity(); i++)
-        {
           return checkSameExpr(e1->arg(i), e2->arg(i));
-        }
       }
       else return false;
     }
