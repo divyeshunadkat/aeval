@@ -193,8 +193,9 @@ namespace apara
       return result;
     }
 
-    void applyEqInvToCHCs(RuleInfoManager& rim)
+    bool applyEqInvToCHCs(RuleInfoManager& rim)
     {
+      bool result = false;
       if(o.getVerbosity() > 1) cout << "\nAppling Inferred Equality Invariants to CHCs\n";
       for (auto & hr : ruleManager.chcs)
       {
@@ -223,10 +224,12 @@ namespace apara
             // Fetch the inferred value from inv for the rhs expression
             // Expr val = fetchValInv();
             // hr.body = replaceAll(hr.body, write, val);
+            // result = true;
           }
           itst++;
         }
       }
+      return result;
     }
 
   public:
@@ -249,20 +252,31 @@ namespace apara
       bool co = ksynth.checkOverlap();
       if(!co) {
         bool rks = ksynth.runKSynthesizer();
+        if(rks) outs () << "\nPARALLELIZATION_SUCCESSFUL\n";
+        else outs () << "\nPARALLELIZATION_UNKNOWN\n";
+        return rks;
       } else {
         bool bs = bootstrapInvs();
         if(bs) learnInvs();
         bool ei = getEqualityInvs();
-        if(ei) applyEqInvToCHCs(rim);
-        else return false;
+        if(ei) {
+          outs () << "\nPARALLELIZATION_SUCCESSFUL\n";
+          /*
+          bool aei = applyEqInvToCHCs(rim);
+          if(aei) outs () << "\nPARALLELIZATION_SUCCESSFUL\n";
+          else outs () << "\nPARALLELIZATION_UNKNOWN\n";
+          return aei;
+          */
+        } else outs () << "\nPARALLELIZATION_UNKNOWN\n";
+        return ei;
       }
       /*
       getSimplifiedInvExpr();
       transformCHCs();
       printTransformedCHCs();
       outputParallelVersion();
-      */
       return parallelized;
+      */
     }
 
   };

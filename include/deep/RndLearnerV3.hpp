@@ -33,6 +33,7 @@ namespace ufo
 
     bool checkInit(Expr rel)
     {
+      if (printLog) outs () << "\nChecking Initiation Condition\n";
       vector<HornRuleExt*> adjacent;
       for (auto &hr: ruleManager.chcs)
       {
@@ -47,6 +48,7 @@ namespace ufo
 
     bool checkInductiveness(Expr rel)
     {
+      if (printLog) outs () << "\nChecking Inductiveness Condition\n";
       vector<HornRuleExt*> adjacent;
       for (auto &hr: ruleManager.chcs)
       {
@@ -74,6 +76,7 @@ namespace ufo
 
     Expr eliminateQuantifiers(Expr e, ExprVector& varsRenameFrom, int invNum, bool bwd)
     {
+      if (printLog) outs () << "\nEliminating Quantifiers\n";
       ExprSet complex;
       if (!containsOp<FORALL>(e))
       {
@@ -125,6 +128,7 @@ namespace ufo
 
     void addPropagatedArrayCands(Expr rel, int invNum, Expr candToProp)
     {
+      if (printLog) outs () << "\nAdding Propagated Array Candidates\n";
       vector<int> tmp;
       ruleManager.getCycleForRel(rel, tmp);
       if (tmp.size() != 1) return; // todo: support
@@ -263,7 +267,7 @@ namespace ufo
 
     bool addCandidate(int invNum, Expr cnd)
     {
-      if (printLog) outs () << "Inside addCandidate\n";
+      if (printLog) outs () << "\nAdding Candidate Lemmas\n";
       SamplFactory& sf = sfs[invNum].back();
       Expr allLemmas = sf.getAllLemmas();
       if (containsOp<FORALL>(cnd) || containsOp<FORALL>(allLemmas))
@@ -311,6 +315,7 @@ namespace ufo
 
     bool finalizeArrCand(Expr& cand, Expr constraint, Expr relFrom)
     {
+      if (printLog) outs () << "\nFinalizing Array Candidates\n";
       // only forward currently
       if (!isOpX<FORALL>(cand)) return false;
       if (!containsOp<ARRAY_TY>(cand)) return false;
@@ -334,6 +339,7 @@ namespace ufo
 
     Expr replaceArrRangeForIndCheck(int invNum, Expr cand, bool fwd = false)
     {
+      if (printLog) outs () << "\nUpdating Array Range for Inductiveness Check\n";
       assert(isOpX<FORALL>(cand));
       Expr itRepl = iterators[invNum];
 
@@ -362,6 +368,7 @@ namespace ufo
 
     bool propagate(int invNum, Expr cand, bool seed)
     {
+      if (printLog) outs () << "\nPropagating\n";
       bool res = true;
       Expr rel = decls[invNum];
       checked.insert(rel);
@@ -409,20 +416,17 @@ namespace ufo
 
     bool checkCand(int invNum)
     {
-      if(printLog) outs () << "Inside checkCand\n";
+      if (printLog) outs () << "\nChecking the Candidate Lemmas\n";
       Expr rel = decls[invNum];
       if (!checkInit(rel)) return false;
-      if(printLog) outs () << "After checkInit\n";
-
       if (!checkInductiveness(rel)) return false;
-      if(printLog) outs () << "After checkInductiveness\n";
-
       return propagate(invNum, conjoin(candidates[invNum], m_efac), false);
     }
 
     // a simple method to generate properties of a larger Array range, given already proven ranges
     void generalizeArrInvars (SamplFactory& sf)
     {
+      if (printLog) outs () << "\nGeneralizing Array Invariants\n";
       if (sf.learnedExprs.size() > 1)
       {
         ExprVector posts;
@@ -563,6 +567,7 @@ namespace ufo
 
     void assignPrioritiesForLearned()
     {
+      if (printLog) outs () << "\nAssigning Priorities for the Learned Candidates\n";
 //      bool progress = true;
       for (auto & cand : candidates)
       {
@@ -595,6 +600,7 @@ namespace ufo
 
     bool synthesize(int maxAttempts, char * outfile)
     {
+      if (printLog) outs () << "\nSynthesizing Invariants\n";
       ExprSet cands;
       for (int i = 0; i < maxAttempts; i++)
       {
@@ -633,6 +639,7 @@ namespace ufo
 
     bool splitUnsatSets(ExprVector & src, ExprVector & dst1, ExprVector & dst2)
     {
+      if (printLog) outs () << "\nSplitting Unsat Sets\n";
       if (u.isSat(src)) return false;
 
       for (auto & a : src) dst1.push_back(a);
@@ -658,6 +665,7 @@ namespace ufo
 
     bool filterUnsat()
     {
+      if (printLog) outs () << "\nFiltering the Unsatisfiable Candidates\n";
       vector<HornRuleExt*> worklist;
       for (int i = 0; i < invNumber; i++)
       {
@@ -713,6 +721,7 @@ namespace ufo
 
     bool multiHoudini(vector<HornRuleExt*> worklist, bool recur = true)
     {
+      if (printLog) outs () << "\nInvoking Houdini Technique\n";
       if (!anyProgress(worklist)) return false;
       map<int, ExprVector> candidatesTmp = candidates;
       bool res1 = true;
@@ -821,6 +830,7 @@ namespace ufo
     // heuristic to instantiate a quantified candidate for some particular instances
     void createGroundInstances (ExprSet& vals, ExprSet& res, Expr qcand, Expr iterVar)
     {
+      if (printLog) outs () << "\nCreating Ground Instances\n";
       ExprSet se;
       filter (qcand, bind::IsSelect (), inserter(se, se.begin()));
 
@@ -840,6 +850,7 @@ namespace ufo
     bool prepareArrCand (Expr& replCand, ExprMap& replLog, ExprVector& av,
                          ExprSet& tmpRanges, ExprSet& concreteVals, int ind, int i = 0)
     {
+      if (printLog) outs () << "\nPrepare Array Candidates\n";
       if (av.empty()) return false;
 
       ExprSet se;
@@ -868,6 +879,7 @@ namespace ufo
     // adapted from doSeedMining
     void getSeeds(Expr invRel, map<Expr, ExprSet>& cands, bool analizeCode = true)
     {
+      if (printLog) outs () << "\nGet Seed Candidates\n";
       int ind = getVarIndex(invRel, decls);
       SamplFactory& sf = sfs[ind].back();
       ExprSet candsFromCode;
@@ -1077,6 +1089,7 @@ namespace ufo
 
 #ifdef HAVE_ARMADILLO
     void getDataCandidates(map<Expr, ExprSet>& cands, const vector<string> & behaviorfiles){
+      if (printLog) outs () << "\nGet Data Candidates\n";
       int fileIndex = 0;
       for (auto & dcl : decls) {
         DataLearner dl(ruleManager, m_z3);
@@ -1107,7 +1120,7 @@ namespace ufo
         for (auto a : tmp2)
         {
           cands[dcl].insert(a);
-          if (printLog) outs () << "\n\nData Candidate: " << *a << "\n\n";
+          if (printLog) outs () << "\nData Candidate: " << *a << "\n";
           if (isNumericConst(a->right()))
 
           for (auto b : substs)
@@ -1120,7 +1133,7 @@ namespace ufo
               {
                 Expr e = replaceAll(a, a->right(), mk<MULT>(mkMPZ(i1/i2, m_efac), c));
                 cands[dcl].insert(e);
-                if (printLog) outs () << "\n\nData Candidate: " << *e << "\n\n";
+                if (printLog) outs () << "\nData Candidate: " << *e << "\n";
               }
           }
         }
@@ -1130,15 +1143,12 @@ namespace ufo
 
     bool bootstrap()
     {
-      if (printLog) outs () << "Inside boostrap\n";
+      if (printLog) outs () << "\nBoostrapping\n";
       filterUnsat();
-      if (printLog) outs () << "After filterUnsat in bootstrap\n";
 
       if (multiHoudini(ruleManager.wtoCHCs))
       {
-        if (printLog) outs () << "After multiHoudini in bootstrap\n";
         assignPrioritiesForLearned();
-        if (printLog) outs () << "After assignPriorities in bootstrap\n";
         if (checkAllLemmas())
         {
           outs () << "Success after bootstrapping\n";
@@ -1161,18 +1171,15 @@ namespace ufo
             checked.clear();
             Expr cand = sf.af.getSimplCand(c);
             if (printLog)
-              outs () << " - - - bootstrapped cand for " << *dcl << ": " << *cand << "\n";
+              outs () << "\n - - - bootstrapped cand for " << *dcl << ": " << *cand << "\n";
 
             auto candidatesTmp = candidates[invNum]; // save for later
             if (!addCandidate(invNum, cand)) continue;
-            if (printLog) outs () << "After addCandidate returned to bootstrap\n";
 
             if (checkCand(invNum))
             {
               assignPrioritiesForLearned();
-              if (printLog) outs () << "After assignPriorities in loop\n";
               generalizeArrInvars(sf);
-              if (printLog) outs () << "After generalizeArrInvars in loop\n";
               if (checkAllLemmas())
               {
                 outs () << "Success after bootstrapping\n";
@@ -1211,9 +1218,7 @@ namespace ufo
         }
         if (multiHoudini(ruleManager.wtoCHCs))
         {
-          if (printLog) outs () << "After multiHoudini in second round of bootstrap\n";
           assignPrioritiesForLearned();
-          if (printLog) outs () << "After assignPriorities in second round of bootstrap\n";
           if (checkAllLemmas())
           {
             outs () << "Success after bootstrapping\n";
@@ -1228,6 +1233,7 @@ namespace ufo
 
     void updateGrammars()
     {
+      if (printLog) outs () << "\nUpdating the Grammars\n";
       // convert candidates to curCandidates and run the method from RndLearner
       for (int ind = 0; ind < invNumber; ind++)
       {
@@ -1240,7 +1246,7 @@ namespace ufo
 
     bool checkAllLemmas()
     {
-      if (printLog) outs () << "Inside checkAllLemmas\n";
+      if (printLog) outs () << "\nChecking All the Lemmas\n";
       candidates.clear();
       for (int i = ruleManager.wtoCHCs.size() - 1; i >= 0; i--)
       {
@@ -1260,28 +1266,20 @@ namespace ufo
               for (auto & l : lms) candidates[i].push_back(l);
             }
             multiHoudini(ruleManager.wtoCHCs);
-            if (printLog) outs () << "After multiHoudini in checkAllLemmas\n";
-
             assignPrioritiesForLearned();
-            if (printLog) outs () << "After assignPriorities in checkAllLemmas\n";
-
-            if (printLog) outs () << "Exiting checkAllLemmas\n";
             return false;
             assert(0);    // only queries are allowed to fail
           }
           else
-          {
-            if (printLog) outs () << "Exiting checkAllLemmas\n";
             return false; // TODO: use this fact somehow
-          }
         }
       }
-      if (printLog) outs () << "Exiting checkAllLemmas\n";
       return true;
     }
 
     bool checkCHC (HornRuleExt& hr, map<int, ExprVector>& annotations)
     {
+      if (printLog) outs () << "\nChecking the CHC\n";
       ExprSet exprs;
       exprs.insert(hr.body);
 
@@ -1326,6 +1324,7 @@ namespace ufo
 
     void initArrayStuff(BndExpl& bnd, int cycleNum, Expr pref)
     {
+      if (printLog) outs () << "\nInitialize Array Data Structures\n";
       vector<int>& cycle = ruleManager.cycles[cycleNum];
       Expr rel = ruleManager.chcs[cycle[0]].srcRelation;
       int invNum = getVarIndex(rel, decls);

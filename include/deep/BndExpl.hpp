@@ -420,7 +420,7 @@ namespace ufo
         for (; l < bindVars.size(); l = l + loop.size())
         {
           vector<double> model;
-          outs () << "model for " << l << ": [";
+          // outs () << "model for " << l << ": [";
           int ai = 0;
           bool toSkip = false;
           for (int i = 0; i < vars.size(); i++) {
@@ -452,9 +452,9 @@ namespace ufo
               value = lexical_cast<double>(m);
             }
             model.push_back(value);
-            outs () << *bvar << " = " << *m << ", ";
+            // outs () << *bvar << " = " << *m << ", ";
           }
-          outs () << "\b\b]\n";
+          // outs () << "\b\b]\n";
           if (!toSkip) models[srcRel].push_back(model);
         }
 

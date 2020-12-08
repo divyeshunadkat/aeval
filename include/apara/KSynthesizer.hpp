@@ -56,9 +56,9 @@ namespace apara
         itsel = allArrSelectAccess[invNum].begin();
         while (itsel != allArrSelectAccess[invNum].end()) {
           if(o.getVerbosity() > 5)
-            outs () << "\nStoreArr: " << itst->first
-                    << "\nSelectArr: " << itsel->first << "\n";
-          if(itst->first != itsel->first) { itsel++; outs () << "Continue\n"; continue; }
+            outs () << "\nStore Array: " << *(itst->first)
+                    << "\nSelect Array: " << *(itsel->first) << "\n";
+          if(itst->first != itsel->first) { itsel++; continue; }
           for(auto & e1 : itst->second) {
             for(auto & e2 : itsel->second) {
               Expr e = mk<AND>(mk<GT>(CVar, mkTerm(mpz_class (0), m_efac)),
