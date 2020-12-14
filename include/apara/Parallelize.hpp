@@ -45,8 +45,7 @@ namespace apara
         cands[ruleManager.chcs[ruleManager.cycles[i][0]].srcRelation].insert(pref);
         ds.initArrayStuff(bnd, i, pref);
       }
-      vector<string> behaviorfiles;
-      ds.getDataCandidates(cands, behaviorfiles); // Data Learning enabled by default!
+      ds.getDataCandidates(cands); // Data Learning enabled by default!
       for (auto& dcl: ruleManager.wtoDecls) ds.getSeeds(dcl, cands);
       ds.refreshCands(cands);
       for (auto& dcl: ruleManager.decls) ds.doSeedMining(dcl->arg(0), cands[dcl->arg(0)], false);

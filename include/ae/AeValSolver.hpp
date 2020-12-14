@@ -1392,53 +1392,10 @@ namespace ufo
     }
   };
 
-
-//  inline void preprocess(Expr& s, Expr& t, Expr& t_orig, bool debug, ExprSet& t_quantified)
-//  {
-//    if (t == NULL)
-//    {
-//      if (!(isOpX<FORALL>(s) && isOpX<EXISTS>(s->last()))) exit(0);
-//
-//      s = regularizeQF(s);
-//      t = s->last()->last();
-//      for (int i = 0; i < s->last()->arity() - 1; i++)
-//        t_quantified.insert(bind::fapp(s->last()->arg(i)));
-//
-//      s = mk<TRUE>(s->getFactory());
-//    }
-//    else
-//    {
-//      ExprSet s_vars;
-//      ExprSet t_vars;
-//
-//      filter (s, bind::IsConst (), inserter (s_vars, s_vars.begin()));
-//      filter (t, bind::IsConst (), inserter (t_vars, t_vars.begin()));
-//
-//      t_quantified = minusSets(t_vars, s_vars);
-//    }
-//
-//    s = convertIntsToReals<DIV>(s);
-//    t = convertIntsToReals<DIV>(t);
-//
-//    t_orig = t;
-//
-//    // formula simplification
-//    t = simplifyBool(t);
-//    ExprSet cnjs;
-//    ExprVector empt;
-//    getConj(t, cnjs);
-//    simplBoolReplCnj(empt, cnjs);
-//    t = conjoin(cnjs, t->getFactory());
-//    t = simplifyBool(t);
-//
-//    if (debug && false)
-//    {
-//      outs() << "S: " << *s << "\n";
-//      outs() << "T: \\exists ";
-//      for (auto &a: t_quantified) outs() << *a << ", ";
-//      outs() << *t << "\n";
-//    }
-//  }
+  inline static bool qeUnsupported (Expr e)
+  {
+    return (isNonlinear(e) || containsOp<MOD>(e) || containsOp<DIV>(e) || containsOp<ARRAY_TY>(e));
+  }
 
   /**
    * Simple wrapper
@@ -1452,7 +1409,7 @@ namespace ufo
     Expr newCond = simplifyArithm(simpleQE(cond, vars));
 
     if (!emptyIntersect(newCond, vars) &&
-        !containsOp<FORALL>(cond) && !containsOp<EXISTS>(cond) && !isNonlinear(newCond))
+        !containsOp<FORALL>(cond) && !containsOp<EXISTS>(cond) && !qeUnsupported(newCond))
     {
       AeValSolver ae(mk<TRUE>(efac), newCond, vars); // exists quantified . formula
       if (ae.solve()) {
@@ -1475,7 +1432,8 @@ namespace ufo
       for (auto & a : qv)
         for (auto & b : a.second)
           for (auto it1 = av.begin(); it1 != av.end(); )
-            if (*it1 == b) { it1 = av.erase(it1); break; }
+            if (*it1 == b) {
+              it1 = av.erase(it1); break; }
             else ++it1;
 
       if (emptyIntersect(av, vars)) ++it;
@@ -1532,11 +1490,6 @@ namespace ufo
       return NULL;
     }
     return tmp;
-  }
-
-  inline static bool qeUnsupported (Expr e)
-  {
-    return (isNonlinear(e) /* || containsOp<MOD>(e)  || containsOp<DIV>(e) */|| containsOp<ARRAY_TY>(e));
   }
 }
 
