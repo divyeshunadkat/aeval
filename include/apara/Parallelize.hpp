@@ -251,7 +251,7 @@ namespace apara
       bool co = ksynth.checkOverlap();
       if(!co) {
         bool rks = ksynth.runKSynthesizer();
-        if(rks) outs () << "\nPARALLELIZATION_SUCCESSFUL\n";
+        if(rks) outs () << "\nPARALLELIZATION_BY_SKOLEM_SUCCESSFUL\n";
         else outs () << "\nPARALLELIZATION_UNKNOWN\n";
         return rks;
       } else {
@@ -259,7 +259,7 @@ namespace apara
         if(bs) learnInvs();
         bool ei = getEqualityInvs();
         if(ei) {
-          outs () << "\nPARALLELIZATION_SUCCESSFUL\n";
+          outs () << "\nPARALLELIZATION_BY_EQ_INVS_SUCCESSFUL\n";
           /*
           bool aei = applyEqInvToCHCs(rim);
           if(aei) outs () << "\nPARALLELIZATION_SUCCESSFUL\n";
