@@ -611,7 +611,7 @@ namespace ufo
         for (int i = 0; i < e1->arity(); i++)
           return checkSameExpr(e1->arg(i), e2->arg(i));
       }
-      else return false;
+      return false;
     }
 
     void serialize_formula(Expr form)

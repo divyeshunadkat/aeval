@@ -52,6 +52,7 @@ namespace apara {
         cout << e.what();
         return false;
       }
+      return true;
     }
 
     bool parse_cmdline(int argc, char** argv) {
