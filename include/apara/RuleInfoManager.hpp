@@ -48,11 +48,14 @@ namespace apara
     {
       if(o.getVerbosity() > 10) outs () << "\nPopulating All Src and Dst Vars\n";
       for (auto & hr : ruleManager.chcs) {
+        //        if (hr.isFact || hr.isQuery || hr.srcRelation != hr.dstRelation) continue;
+        if (!hr.isInductive) continue;
         int invNum = getVarIndex(hr.srcRelation, decls);
         if(invNum < 0) continue;
         srcVarsInRule[invNum].insert(srcVarsInRule[invNum].end(), hr.srcVars.begin(), hr.srcVars.end());
         dstVarsInRule[invNum].insert(dstVarsInRule[invNum].end(), hr.dstVars.begin(), hr.dstVars.end());
         bodyInRule[invNum] = hr.body;
+        outs () << "\nBody for inv" << invNum << " is " << *hr.body << "\n\n";
       }
     }
 

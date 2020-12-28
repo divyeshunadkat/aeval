@@ -121,7 +121,7 @@ namespace apara
     bool checkModified(const int invNum)
     {
       if(o.getVerbosity() > 1) outs () << "\nCheck if any array index has variables that are modified\n";
-      bool result = false;
+      bool result = true;
       map<Expr, ExprVector>::iterator itst  = allArrStoreAccess[invNum].begin();
       while (itst != allArrStoreAccess[invNum].end()) {
         for(auto & e1 : itst->second) {
@@ -132,16 +132,21 @@ namespace apara
             if(o.getVerbosity() > 5) outs () << "\nVars in the index: " << *v << "\n";
             if(v != iterators[invNum]) {
               Expr vp = getCorrespondingVar(v, invNum);
-              result = bool(u.isSat(mk<AND>(bodyInRule.at(invNum), mk<EQ>(v,vp))));
-              if(result) break;
+              if(o.getVerbosity() > 1)
+                outs () << "\nBody of the inv\n" << *bodyInRule.at(invNum) << "\n\n";
+              if(o.getVerbosity() > 1)
+                outs () << "\nEquality expression\n" << *mk<EQ>(v,vp) << "\n\n";
+              result = bool(u.implies(bodyInRule.at(invNum), mk<EQ>(v,vp)));
+              if(o.getVerbosity() > 1 && result) outs () << "\n\nModified Var in the index\n\n";
+              if(!result) break;
             }
           }
-          if(result) break;
+          if(!result) break;
         }
-        if(result) break;
+        if(!result) break;
         itst++;
       }
-      if(result) return result;
+      if(!result) return result;
 
       map<Expr, ExprVector>::iterator itsel = allArrSelectAccess[invNum].begin();
       while (itsel != allArrSelectAccess[invNum].end()) {
@@ -153,13 +158,18 @@ namespace apara
             if(o.getVerbosity() > 5) outs () << "\nVars in the index: " << *v << "\n";
             if(v != iterators[invNum]) {
               Expr vp = getCorrespondingVar(v, invNum);
-              result = bool(u.isSat(mk<AND>(bodyInRule.at(invNum), mk<EQ>(v,vp))));
-              if(result) break;
+              if(o.getVerbosity() > 1)
+                outs () << "\nBody of the inv\n" << *bodyInRule.at(invNum) << "\n\n";
+              if(o.getVerbosity() > 1)
+                outs () << "\nEquality expression\n" << *mk<EQ>(v,vp) << "\n\n";
+              result = bool(u.implies(bodyInRule.at(invNum), mk<EQ>(v,vp)));
+              if(o.getVerbosity() > 1 && result) outs () << "\n\nModified Var in the index\n\n";
+              if(!result) break;
             }
           }
-          if(result) break;
+          if(!result) break;
         }
-        if(result) break;
+        if(!result) break;
         itsel++;
       }
       return result;

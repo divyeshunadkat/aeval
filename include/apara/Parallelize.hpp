@@ -249,7 +249,7 @@ namespace apara
       bool bs = bootstrapInvs();
       bool mv = ksynth.checkModifiedVarsInIndices();
       bool co = ksynth.checkOverlap();
-      if(!mv && !co) {
+      if(mv && !co) {
         bool rks = ksynth.runKSynthesizer();
         if(rks) outs () << "\nPARALLELIZATION_BY_SKOLEM_SUCCESSFUL\n";
         else outs () << "\nPARALLELIZATION_UNKNOWN(1)\n";
