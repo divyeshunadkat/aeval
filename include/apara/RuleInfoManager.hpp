@@ -55,7 +55,6 @@ namespace apara
         srcVarsInRule[invNum].insert(srcVarsInRule[invNum].end(), hr.srcVars.begin(), hr.srcVars.end());
         dstVarsInRule[invNum].insert(dstVarsInRule[invNum].end(), hr.dstVars.begin(), hr.dstVars.end());
         bodyInRule[invNum] = hr.body;
-        outs () << "\nBody for inv" << invNum << " is " << *hr.body << "\n\n";
       }
     }
 
