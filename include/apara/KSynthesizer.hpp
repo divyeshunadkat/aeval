@@ -173,7 +173,9 @@ namespace apara
         if (hr.isFact || hr.isQuery || hr.srcRelation != hr.dstRelation) continue;
         int invNum = getVarIndex(hr.srcRelation, decls);
         if(invNum < 0) continue;
-        ExprVector encCons = encode(invNum);
+
+        ExprVector encCons;
+        if (!encode(invNum, encCons)) return false;
         // Before uncommenting following lines, need to uncomment the functions
         // for ppopulating the data-structure in the RuleInfoManager class
         // generateFM(invNum);
@@ -183,7 +185,7 @@ namespace apara
       return true;
     }
 
-    ExprVector encode(const int invNum)
+    bool encode(const int invNum, ExprVector& res)
     {
       if(o.getVerbosity() > 1) outs () << "\nEncoding the constraints for K Synthesis\n";
       Expr k1Var = bind::intConst(mkTerm<string> ("_APARA_K1_", m_efac));
@@ -251,7 +253,7 @@ namespace apara
       qVars.insert(k3Var);
       AeValSolver ae1(mk<TRUE>(m_efac), mk<AND>(mk<GEQ>(k3Var, k1Var), minCons, resInvs), qVars);
 
-      if (ae1.solve()) assert(0);
+      if (ae1.solve()) return false;
         else minCons = simplifyArithm(ae1.getSkolemFunction(false));
 
       if(o.getVerbosity() > 1) outs () << "\nSolving for max constraints for the bound k4\n";
@@ -259,7 +261,7 @@ namespace apara
       qVars.insert(k4Var);
       AeValSolver ae2(mk<TRUE>(m_efac), mk<AND>(mk<LEQ>(k4Var, k2Var), maxCons, resInvs), qVars);
 
-      if (ae2.solve()) assert(0);
+      if (ae2.solve()) return false;
         else maxCons = simplifyArithm(ae2.getSkolemFunction(false));
 
       if(o.getVerbosity() > 1) {
@@ -275,7 +277,7 @@ namespace apara
       res.push_back(k2Var);
       res.push_back(k3Var);
       res.push_back(k4Var);
-      return res;
+      return true;
     }
 
     void generateFM(const int invNum)

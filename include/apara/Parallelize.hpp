@@ -252,7 +252,7 @@ namespace apara
       if(!mv && !co) {
         bool rks = ksynth.runKSynthesizer();
         if(rks) outs () << "\nPARALLELIZATION_BY_SKOLEM_SUCCESSFUL\n";
-        else outs () << "\nPARALLELIZATION_UNKNOWN\n";
+        else outs () << "\nPARALLELIZATION_UNKNOWN(1)\n";
         return rks;
       } else {
         if(bs) learnInvs();
@@ -265,7 +265,7 @@ namespace apara
           else outs () << "\nPARALLELIZATION_UNKNOWN\n";
           return aei;
           */
-        } else outs () << "\nPARALLELIZATION_UNKNOWN\n";
+        } else outs () << "\nPARALLELIZATION_UNKNOWN(2)\n";
         return ei;
       }
       /*
