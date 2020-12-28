@@ -75,7 +75,7 @@ namespace apara
         if(o.getVerbosity() > 10) outs () << "\nCorresponding Variable: " << *cv;
         return cv;
       } else {
-        outs () << "\nUnable to find the variable " << v << " in the horn rule\n";
+        outs () << "\nUnable to find the variable " << *v << " in the horn rule\n";
         return mk<FALSE>(m_efac);
       }
     }
@@ -130,11 +130,12 @@ namespace apara
           u.extractVars(e1, vars);
           for(auto & v : vars) {
             if(o.getVerbosity() > 5) outs () << "\nVars in the index: " << *v << "\n";
-            if(v != iterators[invNum]) {
+            if(v != iterators[invNum] && !isOpX<MPZ>(v)) {
               Expr vp = getCorrespondingVar(v, invNum);
-              if(o.getVerbosity() > 1)
+              if (isOpX<FALSE>(vp)) continue;
+              if(o.getVerbosity() > 10)
                 outs () << "\nBody of the inv\n" << *bodyInRule.at(invNum) << "\n\n";
-              if(o.getVerbosity() > 1)
+              if(o.getVerbosity() > 10)
                 outs () << "\nEquality expression\n" << *mk<EQ>(v,vp) << "\n\n";
               result = bool(u.implies(bodyInRule.at(invNum), mk<EQ>(v,vp)));
               if(o.getVerbosity() > 1 && result) outs () << "\n\nModified Var in the index\n\n";
@@ -156,11 +157,12 @@ namespace apara
           u.extractVars(e2, vars);
           for(auto & v : vars) {
             if(o.getVerbosity() > 5) outs () << "\nVars in the index: " << *v << "\n";
-            if(v != iterators[invNum]) {
+            if(v != iterators[invNum] && !isOpX<MPZ>(v)) {
               Expr vp = getCorrespondingVar(v, invNum);
-              if(o.getVerbosity() > 1)
+              if (isOpX<FALSE>(vp)) continue;
+              if(o.getVerbosity() > 10)
                 outs () << "\nBody of the inv\n" << *bodyInRule.at(invNum) << "\n\n";
-              if(o.getVerbosity() > 1)
+              if(o.getVerbosity() > 10)
                 outs () << "\nEquality expression\n" << *mk<EQ>(v,vp) << "\n\n";
               result = bool(u.implies(bodyInRule.at(invNum), mk<EQ>(v,vp)));
               if(o.getVerbosity() > 1 && result) outs () << "\n\nModified Var in the index\n\n";
@@ -179,7 +181,6 @@ namespace apara
     {
       if(o.getVerbosity() > 1) outs () << "\nPerforming K Synthesis\n";
       for (auto & hr : ruleManager.chcs) {
-        hr.print();
         if (hr.isFact || hr.isQuery || hr.srcRelation != hr.dstRelation) continue;
         int invNum = getVarIndex(hr.srcRelation, decls);
         if(invNum < 0) continue;
