@@ -614,6 +614,63 @@ namespace ufo
       else return false;
     }
 
+    /**
+     * Extract vars from the given expression
+     */
+    void extractVars (const Expr & e, ExprSet& es)
+    {
+      if (isOpX<FORALL>(e) || isOpX<EXISTS>(e))
+      {
+        for (int i = 0; i < e->arity() - 1; i++)
+        {
+          Expr var = bind::fapp(e->arg(i));
+          es.insert(var);
+        }
+        extractVars(e->last(), es);
+      }
+      else if (isOpX<AND>(e))
+      {
+        ExprSet cnjs;
+        getConj(e, cnjs);
+        for (auto & c : cnjs)
+          extractVars(c, es);
+      }
+      else if (isOpX<OR>(e))
+      {
+        ExprSet dsjs;
+        getDisj(e, dsjs);
+        for (auto & d : dsjs)
+          extractVars(d, es);
+      }
+      else if (isOpX<IMPL>(e) || isOp<ComparissonOp>(e))
+      {
+        extractVars(e->left(), es);
+        extractVars(e->right(), es);
+      }
+      else if (isOpX<ITE>(e))
+      {
+        extractVars(e->left(), es);
+        extractVars(e->right(), es);
+        extractVars(e->last(), es);
+      }
+      else if (isOpX<STORE>(e) || isOpX<SELECT>(e))
+      {
+        for (int i = 0; i < e->arity() - 1; i++)
+          extractVars(e->arg(i), es);
+      }
+      else  if (isOpX<PLUS>(e) || isOpX<MINUS>(e) ||
+                isOpX<MULT>(e) || isOpX<DIV>(e) ||
+                isOpX<MOD>(e) || isOpX<IDIV>(e) ||
+                isOpX<REM>(e) ||  isOpX<UN_MINUS>(e))
+      {
+        for (int i = 0; i < e->arity(); i++)
+          extractVars(e->arg(i), es);
+      }
+      else if (isOpX<FDECL>(e))
+      {}
+      else es.insert(e);
+    }
+
     void serialize_formula(Expr form)
     {
       outs () << "(assert ";

@@ -5,6 +5,7 @@
 #include "deep/Horn.hpp"
 #include "ae/SMTUtils.hpp"
 #include "apara/RuleInfoManager.hpp"
+#include "apara/Learner.hpp"
 
 using namespace std;
 using namespace ufo;
@@ -17,6 +18,7 @@ namespace apara
 
     ExprFactory &m_efac;
     CHCs& ruleManager;
+    Learner& ds;
     ExprVector& decls;
     map<int, Expr> iterators;
     map<int, bool> iterGrows;
@@ -26,6 +28,9 @@ namespace apara
     Options& o;
     SMTUtils u;
 
+    map<int, ExprVector>& srcVarsInRule;
+    map<int, ExprVector>& dstVarsInRule;
+    map<int, Expr>& bodyInRule;
     map<int, ExprVector>& itesPerLoop;
     map<int, map<Expr, ExprVector>>& allArrStoreAccess;
     map<int, map<Expr, ExprVector>>& allArrSelectAccess;
@@ -40,6 +45,40 @@ namespace apara
     map<int, map<Expr, map<Expr, vector<bool>>>> redundantStores;
     map<int, ExprVector> KS;
     map<int, ExprVector> KSResult;
+
+    Expr getCorrespondingVar(Expr v, int invNum) {
+      bool found = false;
+      int i = 0;
+      for(auto& sv : srcVarsInRule.at(invNum)) {
+        if(v == sv) {
+          found = true;
+          break;
+        }
+        i++;
+      }
+      if(found) {
+        Expr cv = dstVarsInRule.at(invNum)[i];
+        if(o.getVerbosity() > 10) outs () << "\nCorresponding Variable: " << *cv;
+        return cv;
+      } else {
+        i = 0;
+      }
+      for(auto& dv : dstVarsInRule.at(invNum)) {
+        if(v == dv) {
+          found = true;
+          break;
+        }
+        i++;
+      }
+      if(found) {
+        Expr cv = srcVarsInRule.at(invNum)[i];
+        if(o.getVerbosity() > 10) outs () << "\nCorresponding Variable: " << *cv;
+        return cv;
+      } else {
+        outs () << "\nUnable to find the variable " << v << " in the horn rule\n";
+        return mk<FALSE>(m_efac);
+      }
+    }
 
     // Assumes all array indices are from the same statement
     // TODO: Seperate design for multiple statements in a single loop
@@ -65,7 +104,7 @@ namespace apara
                                mk<EQ>(e1, mk<PLUS>(e2, CVar)));
               result = bool(u.isSat(e));
               if(o.getVerbosity() > 5)
-                outs () << "\nOverlap Query: " << e << "\nResult: " << result << "\n";
+                outs () << "\nOverlap Query: " << *e << "\nResult: " << result << "\n";
               if(result) break;
             }
             if(result) break;
@@ -79,10 +118,58 @@ namespace apara
       return result;
     }
 
+    bool checkModified(const int invNum)
+    {
+      if(o.getVerbosity() > 1) outs () << "\nCheck if any array index has variables that are modified\n";
+      bool result = false;
+      map<Expr, ExprVector>::iterator itst  = allArrStoreAccess[invNum].begin();
+      while (itst != allArrStoreAccess[invNum].end()) {
+        for(auto & e1 : itst->second) {
+          if(o.getVerbosity() > 5) outs () << "\nChecking index: " << *e1 << "\n";
+          ExprSet vars;
+          u.extractVars(e1, vars);
+          for(auto & v : vars) {
+            if(o.getVerbosity() > 5) outs () << "\nVars in the index: " << *v << "\n";
+            if(v != iterators[invNum]) {
+              Expr vp = getCorrespondingVar(v, invNum);
+              result = bool(u.isSat(mk<AND>(bodyInRule.at(invNum), mk<EQ>(v,vp))));
+              if(result) break;
+            }
+          }
+          if(result) break;
+        }
+        if(result) break;
+        itst++;
+      }
+      if(result) return result;
+
+      map<Expr, ExprVector>::iterator itsel = allArrSelectAccess[invNum].begin();
+      while (itsel != allArrSelectAccess[invNum].end()) {
+        for(auto & e2 : itsel->second) {
+          if(o.getVerbosity() > 5) outs () << "\nChecking index: " << *e2 << "\n";
+          ExprSet vars;
+          u.extractVars(e2, vars);
+          for(auto & v : vars) {
+            if(o.getVerbosity() > 5) outs () << "\nVars in the index: " << *v << "\n";
+            if(v != iterators[invNum]) {
+              Expr vp = getCorrespondingVar(v, invNum);
+              result = bool(u.isSat(mk<AND>(bodyInRule.at(invNum), mk<EQ>(v,vp))));
+              if(result) break;
+            }
+          }
+          if(result) break;
+        }
+        if(result) break;
+        itsel++;
+      }
+      return result;
+    }
+
     bool runKSynth()
     {
       if(o.getVerbosity() > 1) outs () << "\nPerforming K Synthesis\n";
       for (auto & hr : ruleManager.chcs) {
+        hr.print();
         if (hr.isFact || hr.isQuery || hr.srcRelation != hr.dstRelation) continue;
         int invNum = getVarIndex(hr.srcRelation, decls);
         if(invNum < 0) continue;
@@ -105,48 +192,81 @@ namespace apara
       Expr k4Var = bind::intConst(mkTerm<string> ("_APARA_K4_", m_efac));
       Expr igeqk3 = mk<GEQ>(iterators[invNum], k3Var);
       Expr iltk4 = mk<LT>(iterators[invNum], k4Var);
+      if(o.getVerbosity() > 1) outs () << "\nEncoding of i >= k3\n" << *igeqk3 << "\n";
+      if(o.getVerbosity() > 1) outs () << "\nEncoding of i < k4\n" << *iltk4 << "\n";
       ExprVector conj_min_constraints;
       ExprVector conj_max_constraints;
       map<Expr, ExprVector>::iterator itst = allArrStoreAccess[invNum].begin();
       while (itst != allArrStoreAccess[invNum].end()) {
         for(auto & e2 : itst->second) {
-          conj_min_constraints.push_back(mk<GEQ>(e2, k1Var));
-          conj_max_constraints.push_back(mk<LT>(e2, k2Var));
+          Expr minc = mk<GEQ>(e2, k1Var);
+          Expr maxc = mk<LT>(e2, k2Var);
+          conj_min_constraints.push_back(minc);
+          conj_max_constraints.push_back(maxc);
+          if(o.getVerbosity() > 1) outs () << "\nAdding min constraint\n" << *minc << "\n";
+          if(o.getVerbosity() > 1) outs () << "\nAdding max constraint\n" << *maxc << "\n";
         }
         itst++;
       }
       map<Expr, ExprVector>::iterator itsel = allArrSelectAccess[invNum].begin();
       while (itsel != allArrSelectAccess[invNum].end()) {
         for(auto & e2 : itsel->second) {
-          conj_min_constraints.push_back(mk<GEQ>(e2, k1Var));
-          conj_max_constraints.push_back(mk<LT>(e2, k2Var));
+          Expr minc = mk<GEQ>(e2, k1Var);
+          Expr maxc = mk<LT>(e2, k2Var);
+          conj_min_constraints.push_back(minc);
+          conj_max_constraints.push_back(maxc);
+          if(o.getVerbosity() > 1) outs () << "\nAdding min constraint\n" << *minc << "\n";
+          if(o.getVerbosity() > 1) outs () << "\nAdding max constraint\n" << *maxc << "\n";
         }
         itsel++;
       }
+
+      Expr resInvs = mk<TRUE>(m_efac);
+      /*
+      ExprSet nonQFInvs;
+      for (int i = 0; i < ds.getDecls().size(); i++)
+      {
+        SamplFactory& sf = ds.getSFS()[i].back();
+        for( auto & e : sf.learnedExprs ) {
+          if (isOpX<FORALL>(e) || isOpX<EXISTS>(e) ) continue;
+          nonQFInvs.insert(e);
+        }
+      }
+      resInvs = conjoin(nonQFInvs, m_efac);
+      if(o.getVerbosity() > 1) outs () << "\nInvariants\n" << *resInvs << "\n";
+      */
 
       ExprSet qVars;
       qVars.insert(iterators[invNum]);
       Expr minCons  = mkNeg(eliminateQuantifiers(mkNeg(mk<IMPL>(igeqk3, conjoin(conj_min_constraints, m_efac))), qVars));
       Expr maxCons  = mkNeg(eliminateQuantifiers(mkNeg(mk<IMPL>(iltk4, conjoin(conj_max_constraints, m_efac))), qVars));
 
+      if(o.getVerbosity() > 1) {
+        outs () << "Printing min constraint:\n" << *minCons << "\n";
+        outs () << "Printing max constraint:\n" << *maxCons << "\n";
+      }
+
+      if(o.getVerbosity() > 1) outs () << "\nSolving for min constraints for the bound k3\n";
       qVars.clear();
       qVars.insert(k3Var);
-      AeValSolver ae1(mk<TRUE>(m_efac), mk<AND>(mk<GEQ>(k3Var, k1Var), minCons), qVars);
+      AeValSolver ae1(mk<TRUE>(m_efac), mk<AND>(mk<GEQ>(k3Var, k1Var), minCons, resInvs), qVars);
 
       if (ae1.solve()) assert(0);
         else minCons = simplifyArithm(ae1.getSkolemFunction(false));
 
+      if(o.getVerbosity() > 1) outs () << "\nSolving for max constraints for the bound k4\n";
       qVars.clear();
       qVars.insert(k4Var);
-      AeValSolver ae2(mk<TRUE>(m_efac), mk<AND>(mk<LEQ>(k4Var, k2Var), maxCons), qVars);
+      AeValSolver ae2(mk<TRUE>(m_efac), mk<AND>(mk<LEQ>(k4Var, k2Var), maxCons, resInvs), qVars);
 
       if (ae2.solve()) assert(0);
         else maxCons = simplifyArithm(ae2.getSkolemFunction(false));
 
       if(o.getVerbosity() > 1) {
-        outs () << "Printing min constraint: \n" << *minCons << "\n";
-        outs () << "Printing max constraint: \n" << *maxCons << "\n";
+        outs () << "\nSolved min constraint:\n" << *minCons << "\n";
+        outs () << "\nSolved max constraint:\n" << *maxCons << "\n";
       }
+
       ExprVector res;
       res.push_back(minCons);
       res.push_back(maxCons);
@@ -441,7 +561,25 @@ namespace apara
       return false;
     }
 
+    bool checkModifiedFn()
+    {
+      if(o.getVerbosity() > 1) outs () << "\nChecking for modified variabes in the Array Accesses\n";
+      for (auto & hr : ruleManager.chcs) {
+        if (hr.isFact || hr.isQuery || hr.srcRelation != hr.dstRelation) continue;
+        int invNum = getVarIndex(hr.srcRelation, decls);
+        if(invNum < 0) continue;
+        bool modified = checkModified(invNum);
+        if(modified) {
+          if(o.getVerbosity() > 1)
+            outs () << "\nModified variables present in the array access for loop:" << invNum << "\n";
+          return true;
+        }
+      }
+      return false;
+    }
+
   public:
+    /*
     KSynthesizer (ExprFactory &efac, CHCs& r, vector<Expr>& d, map<int, Expr>& iters,
                   map<int, bool>& iterg, map<int, Expr>& prec, map<int, Expr>& postc,
                   RuleInfoManager& rim_, Options& opt) :
@@ -457,8 +595,29 @@ namespace apara
       arrStoreAccessOutsideAllITE(rim.getArrStoreAccessOutsideITE()),
       arrSelectAccessOutsideAllITE(rim.getArrSelectAccessOutsideITE())
     {}
+    */
+    KSynthesizer (ExprFactory &efac, CHCs& r, Learner& ds_,
+                  RuleInfoManager& rim_, Options& opt) :
+      m_efac(efac), ruleManager(r), ds(ds_), decls(ds_.getDecls()),
+      iterators(ds_.getIterators()), iterGrows(ds_.getIterGrows()),
+      preconds(ds_.getPreConds()), postconds(ds_.getPostConds()),
+      rim(rim_), o(opt), u(efac),
+      srcVarsInRule(rim.getSrcs()),
+      dstVarsInRule(rim.getDsts()),
+      bodyInRule(rim.getBodys()),
+      itesPerLoop(rim.getITEs()),
+      allArrStoreAccess(rim.getAllArrStoreAccess()),
+      allArrSelectAccess(rim.getAllArrSelectAccess()),
+      arrStoreAccessInITEBr(rim.getArrStoreAccessInITEBr()),
+      arrSelectAccessInITEBr(rim.getArrSelectAccessInITEBr()),
+      arrStoreAccessInITE(rim.getArrStoreAccessInITE()),
+      arrSelectAccessInITE(rim.getArrSelectAccessInITE()),
+      arrStoreAccessOutsideAllITE(rim.getArrStoreAccessOutsideITE()),
+      arrSelectAccessOutsideAllITE(rim.getArrSelectAccessOutsideITE())
+    {}
 
     inline bool checkOverlap() { return checkOverlapFn(); }
+    inline bool checkModifiedVarsInIndices() { return checkModifiedFn(); }
     inline bool runKSynthesizer() { return runKSynth(); }
 
   };

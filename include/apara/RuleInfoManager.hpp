@@ -17,6 +17,9 @@ namespace apara
     ExprVector& decls;
     Options& o;
 
+    map<int, ExprVector> srcVarsInRule;
+    map<int, ExprVector> dstVarsInRule;
+    map<int, Expr> bodyInRule;
     map<int, ExprVector> itesPerLoop;
     map<int, map<Expr, ExprVector>> allArrStore;
     map<int, map<Expr, ExprVector>> allArrSelect;
@@ -32,12 +35,25 @@ namespace apara
     void populateAccesses()
     {
       if(o.getVerbosity() > 10) outs () << "\nPopulate All Accesses\n";
+      populateSrcDstVars();
       populateAllArrAccess();
       populateAllArrSelectStore();
       // Following functions are needed for an experimental algorithm in KSynth
       // Currently that algorithm is not in use and hence following lines are commented
       // populateITESNAccess();
       // populateOutsideAccessLists();
+    }
+
+    void populateSrcDstVars()
+    {
+      if(o.getVerbosity() > 10) outs () << "\nPopulating All Src and Dst Vars\n";
+      for (auto & hr : ruleManager.chcs) {
+        int invNum = getVarIndex(hr.srcRelation, decls);
+        if(invNum < 0) continue;
+        srcVarsInRule[invNum].insert(srcVarsInRule[invNum].end(), hr.srcVars.begin(), hr.srcVars.end());
+        dstVarsInRule[invNum].insert(dstVarsInRule[invNum].end(), hr.dstVars.begin(), hr.dstVars.end());
+        bodyInRule[invNum] = hr.body;
+      }
     }
 
     void getITES(const Expr term, ExprVector& iteVec)
@@ -207,6 +223,9 @@ namespace apara
     RuleInfoManager (CHCs& r, vector<Expr>& d, Options& opt) :
       ruleManager(r), decls(d), o(opt) { populateAccesses(); }
 
+    inline map<int, ExprVector>& getSrcs() { return srcVarsInRule; }
+    inline map<int, ExprVector>& getDsts() { return dstVarsInRule; }
+    inline map<int, Expr>& getBodys() { return bodyInRule; }
     inline map<int, ExprVector>& getITEs() { return itesPerLoop; }
     inline map<int, map<Expr, ExprVector>>& getAllArrStore() { return allArrStore; }
     inline map<int, map<Expr, ExprVector>>& getAllArrSelect() {return allArrSelect; }

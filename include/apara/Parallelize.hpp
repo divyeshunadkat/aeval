@@ -245,17 +245,16 @@ namespace apara
     {
       if(o.getVerbosity() > 1) outs () << "\nInvoked the Parallelization Engine\n";
       RuleInfoManager rim(ruleManager, ds.getDecls(), o);
-      KSynthesizer ksynth(m_efac, ruleManager, ds.getDecls(), ds.getIterators(),
-                          ds.getIterGrows(), ds.getPreConds(), ds.getPostConds(),
-                          rim, o);
+      KSynthesizer ksynth(m_efac, ruleManager, ds, rim, o);
+      bool bs = bootstrapInvs();
+      bool mv = ksynth.checkModifiedVarsInIndices();
       bool co = ksynth.checkOverlap();
-      if(!co) {
+      if(!mv && !co) {
         bool rks = ksynth.runKSynthesizer();
         if(rks) outs () << "\nPARALLELIZATION_BY_SKOLEM_SUCCESSFUL\n";
         else outs () << "\nPARALLELIZATION_UNKNOWN\n";
         return rks;
       } else {
-        bool bs = bootstrapInvs();
         if(bs) learnInvs();
         bool ei = getEqualityInvs();
         if(ei) {

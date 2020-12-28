@@ -3,7 +3,6 @@
 
 #include <fstream>
 #include "apara/Options.hpp"
-#include "apara/KSynthesizer.hpp"
 #include "deep/RndLearnerV2.hpp"
 #include "deep/RndLearnerV3.hpp"
 
