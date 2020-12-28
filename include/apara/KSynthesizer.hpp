@@ -269,7 +269,6 @@ namespace apara
         outs () << "\nSolved max constraint:\n" << *maxCons << "\n";
       }
 
-      ExprVector res;
       res.push_back(minCons);
       res.push_back(maxCons);
       res.push_back(iterators[invNum]);
